@@ -8,7 +8,7 @@ COPY go.* .
 RUN go mod download
 COPY . .
 
-# RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/go-ansible-vault .
+# RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/go-lcg .
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} garble  -literals -tiny build -ldflags="-w -s" -o /out/go-lcg .
 
 FROM scratch AS bin-unix

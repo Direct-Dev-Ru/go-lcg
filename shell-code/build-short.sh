@@ -4,5 +4,5 @@ docker build -f Dockerfiles/LocalCompile/Dockerfile --target bin-linux --output 
 docker build -f Dockerfiles/LocalCompile/Dockerfile --target bin-linux --output bin-linux-arm64/ --platform linux/arm64 .
 
 # in linux setuid
-# sudo chown root:root bin-linux/go-ansible-vault
-# sudo chmod +s bin-linux/go-ansible-vault
+# sudo chown root:root bin-linux/lcg
+# sudo chmod +s bin-linux/lcg

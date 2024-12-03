@@ -44,12 +44,20 @@ Usage: lcg [options]
 
   --help        -h  output usage information
   --version     -v  output the version number
-  --file        -f  read command from file
+  --file        -f  read part of command from file or bash feature $(...)
   --update-key  -u  update the API key
   --delete-key  -d  delete the API key
 
 Example Usage: lcg I want to extract linux-command-gpt.tar.gz file
 Example Usage: lcg --file /path/to/file.json I want to print object questions with jq
+
+Env Vars:
+	LCG_HOST - defaults to "http://192.168.87.108:11434/" - endpoint for Ollama or other LLM API
+	LCG_COMPLETIONS_PATH -defaults to "api/chat" - relative part of endpoint
+	LCG_MODEL - defaults to "codegeex4"
+	LCG_PROMPT - defaults to Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks.
+	LCG_API_KEY_FILE - defaults to ${HOME}/.openai_api_key - file with API key
+	LCG_RESULT_FOLDER - defaults to $(pwd)/gpt_results - folder to save results
   `
 
 	VERSION        = Version

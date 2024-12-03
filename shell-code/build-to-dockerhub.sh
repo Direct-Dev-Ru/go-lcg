@@ -1,13 +1,13 @@
 #!/bin/bash
 
-REPO=kuznetcovay/go-ansible-vault
+REPO=kuznetcovay/go-lcg
 VERSION=$1
 if [ -z "$VERSION" ]; then
     VERSION=v1.0.8    
 fi
 BRANCH=main
 
-echo ${VERSION} > VERSION.txt
+echo "${VERSION}" > VERSION.txt
 export GOCACHE="${HOME}/.cache/go-build"
 
 # Save the current branch
@@ -34,7 +34,7 @@ if ! go test -v -run=^Test; then
 fi
 
 # Push multi-platform images
-docker buildx build --push --platform linux/amd64,linux/arm64 -t ${REPO}:${VERSION} . ||
+docker buildx build --push --platform linux/amd64,linux/arm64 -t ${REPO}:"${VERSION}" . ||
         {
                 echo "docker buildx build --push failed. Exiting with code 1."
                 exit 1

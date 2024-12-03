@@ -11,7 +11,7 @@ COPY . .
 RUN echo $BUILDPLATFORM > buildplatform
 RUN echo $TARGETARCH > targetarch
 
-# RUN GOOS=linux GOARCH=$TARGETARCH go build -o output/go-ansible-vault
+# RUN GOOS=linux GOARCH=$TARGETARCH go build -o /app/go-lcg .
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} garble -literals -tiny build -ldflags="-w -s" -o /app/go-lcg .
 
 FROM alpine:latest

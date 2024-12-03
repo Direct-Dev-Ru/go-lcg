@@ -5,28 +5,18 @@ VERSION_FILE="VERSION.txt"
 
 GITHUB_TOKEN="${GITHUB_TOKEN}"  # Replace with your GitHub token
 
-REPO="Direct-Dev-Ru/binaries.git"  # Replace with your GitHub username/repo
+REPO="direct-dev-ru/binaries"  # Replace with your GitHub username/repo
 
-TAG=go-ansible-vault.$(cat "$VERSION_FILE")
+TAG=lcg.$(cat "$VERSION_FILE")
 
-echo $TAG
+echo TAG: $TAG
 
-RELEASE_NAME="Binaries ${TAG}"  # Replace with your release title
-
-RELEASE_DIR="/home/su/projects/golang/ansible-vault/binaries-for-upload"  
-
-# Create a new release
-# response=$(curl -s -X POST \
-#     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-#     -H "Accept: application/vnd.github+json" \
-#     -H "X-GitHub-Api-Version: 2022-11-28" \
-#     https://api.github.com/repos/$REPO/releases \
-#     -d "{\"tag_name\": \"$TAG\", \"name\": \"$RELEASE_NAME\"}")
+RELEASE_DIR="/home/su/projects/golang/linux-command-gpt/binaries-for-upload"  
 
 body="{\"tag_name\":\"${TAG}\", \"target_commitish\":\"main\", \"name\":\"${TAG}\", \
   \"body\":\"${TAG}\", \"draft\":false, \"prerelease\":false, \"generate_release_notes\":false}"
 
-echo $body
+echo BODY: $body
 
 response=$(curl -L -X POST \
   -H "Accept: application/vnd.github+json" \
@@ -34,7 +24,6 @@ response=$(curl -L -X POST \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   https://api.github.com/repos/direct-dev-ru/binaries/releases \
   -d $body)
-
 
 echo $response
 
