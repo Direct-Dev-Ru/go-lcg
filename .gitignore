@@ -9,3 +9,7 @@ go.work
 *.log
 lcg
 dist/
+shell-code/build.env
+bin-linux-amd64/*
+bin-linux-arm64/*
+binaries-for-upload/*

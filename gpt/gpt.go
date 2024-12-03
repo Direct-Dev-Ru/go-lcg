@@ -27,8 +27,13 @@ type Chat struct {
 }
 
 type Gpt3Request struct {
-	Model       string  `json:"model"`
-	Messages    []Chat  `json:"messages"`
+	Model    string      `json:"model"`
+	Stream   bool        `json:"stream"`
+	Messages []Chat      `json:"messages"`
+	Options  Gpt3Options `json:"options"`
+}
+
+type Gpt3Options struct {
 	Temperature float64 `json:"temperature"`
 }
 
@@ -36,6 +41,20 @@ type Gpt3Response struct {
 	Choices []struct {
 		Message Chat `json:"message"`
 	} `json:"choices"`
+}
+
+// LlamaResponse represents the response structure.
+type OllamaResponse struct {
+	Model              string `json:"model"`
+	CreatedAt          string `json:"created_at"`
+	Message            Chat   `json:"message"`
+	Done               bool   `json:"done"`
+	TotalDuration      int64  `json:"total_duration"`
+	LoadDuration       int64  `json:"load_duration"`
+	PromptEvalCount    int64  `json:"prompt_eval_count"`
+	PromptEvalDuration int64  `json:"prompt_eval_duration"`
+	EvalCount          int64  `json:"eval_count"`
+	EvalDuration       int64  `json:"eval_duration"`
 }
 
 func (gpt3 *Gpt3) deleteApiKey() {
@@ -132,17 +151,19 @@ func (gpt3 *Gpt3) Completions(ask string) string {
 		panic(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(gpt3.ApiKey))
+	// req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(gpt3.ApiKey))
 
 	messages := []Chat{
 		{"system", gpt3.Prompt},
-		{"user", ask},
+		{"user", ask + "." + gpt3.Prompt},
 	}
 	payload := Gpt3Request{
-		gpt3.Model,
-		messages,
-		gpt3.Temperature,
+		Model:    gpt3.Model,
+		Messages: messages,
+		Stream:   false,
+		Options:  Gpt3Options{gpt3.Temperature},
 	}
+
 	payloadJson, err := json.Marshal(payload)
 	if err != nil {
 		panic(err)
@@ -166,11 +187,13 @@ func (gpt3 *Gpt3) Completions(ask string) string {
 		return ""
 	}
 
-	var res Gpt3Response
+	// var res Gpt3Response
+	var res OllamaResponse
 	err = json.Unmarshal(body, &res)
 	if err != nil {
 		panic(err)
 	}
 
-	return strings.TrimSpace(res.Choices[0].Message.Content)
+	// return strings.TrimSpace(res.Choices[0].Message.Content)
+	return strings.TrimSpace(res.Message.Content)
 }
