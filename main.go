@@ -104,7 +104,7 @@ func getCommands() []*cli.Command {
 			Aliases: []string{"u"},
 			Usage:   "Update the API key",
 			Action: func(c *cli.Context) error {
-				gpt3 := initGPT()
+				gpt3 := initGPT(PROMPT)
 				gpt3.UpdateKey()
 				fmt.Println("API key updated.")
 				return nil
@@ -115,7 +115,7 @@ func getCommands() []*cli.Command {
 			Aliases: []string{"d"},
 			Usage:   "Delete the API key",
 			Action: func(c *cli.Context) error {
-				gpt3 := initGPT()
+				gpt3 := initGPT(PROMPT)
 				gpt3.DeleteKey()
 				fmt.Println("API key deleted.")
 				return nil
@@ -138,8 +138,12 @@ func executeMain(file, system, commandInput string) {
 		os.MkdirAll(RESULT_FOLDER, 0755)
 	}
 
-	gpt3 := initGPT()
+	gpt3 := initGPT(system)
 
+	// if system != PROMPT {
+	// 	commandInput += ". " + system
+	// }
+	fmt.Println(commandInput)
 	response, elapsed := getCommand(gpt3, commandInput)
 	if response == "" {
 		fmt.Println("No response received.")
@@ -150,12 +154,12 @@ func executeMain(file, system, commandInput string) {
 	handlePostResponse(response, gpt3, system, commandInput)
 }
 
-func initGPT() gpt.Gpt3 {
+func initGPT(system string) gpt.Gpt3 {
 	currentUser, _ := user.Current()
 	return gpt.Gpt3{
 		CompletionUrl: HOST + COMPLETIONS,
 		Model:         MODEL,
-		Prompt:        PROMPT,
+		Prompt:        system,
 		HomeDir:       currentUser.HomeDir,
 		ApiKeyFile:    API_KEY_FILE,
 		Temperature:   0.01,
