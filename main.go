@@ -13,88 +13,158 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/direct-dev-ru/linux-command-gpt/gpt"
 	"github.com/direct-dev-ru/linux-command-gpt/reader"
+	"github.com/urfave/cli/v2"
 )
 
 //go:embed VERSION.txt
 var Version string
 
-var cwd, _ = os.Getwd()
-
 var (
+	cwd, _        = os.Getwd()
 	HOST          = getEnv("LCG_HOST", "http://192.168.87.108:11434/")
-	COMPLETIONS   = getEnv("LCG_COMPLETIONS_PATH", "api/chat") // relative part of endpoint
+	COMPLETIONS   = getEnv("LCG_COMPLETIONS_PATH", "api/chat")
 	MODEL         = getEnv("LCG_MODEL", "codegeex4")
 	PROMPT        = getEnv("LCG_PROMPT", "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks. No need ` symbols.")
 	API_KEY_FILE  = getEnv("LCG_API_KEY_FILE", ".openai_api_key")
 	RESULT_FOLDER = getEnv("LCG_RESULT_FOLDER", path.Join(cwd, "gpt_results"))
-
-	// HOST        = "https://api.openai.com/v1/"
-	// COMPLETIONS = "chat/completions"
-
-	// MODEL       = "gpt-4o-mini"
-	// MODEL  = "codellama:13b"
-
-	// This file is created in the user's home directory
-	// Example: /home/username/.openai_api_key
-	// API_KEY_FILE = ".openai_api_key"
-
-	HELP = `
-
-Usage: lcg [options]
-
-  --help        -h  output usage information
-  --version     -v  output the version number
-  --file        -f  read part of command from file or bash feature $(...)
-  --update-key  -u  update the API key
-  --delete-key  -d  delete the API key
-
-Example Usage: lcg I want to extract linux-command-gpt.tar.gz file
-Example Usage: lcg --file /path/to/file.json I want to print object questions with jq
-
-Env Vars:
-	LCG_HOST - defaults to "http://192.168.87.108:11434/" - endpoint for Ollama or other LLM API
-	LCG_COMPLETIONS_PATH -defaults to "api/chat" - relative part of endpoint
-	LCG_MODEL - defaults to "codegeex4"
-	LCG_PROMPT - defaults to Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks.
-	LCG_API_KEY_FILE - defaults to ${HOME}/.openai_api_key - file with API key
-	LCG_RESULT_FOLDER - defaults to $(pwd)/gpt_results - folder to save results
-  `
-
-	VERSION        = Version
-	CMD_HELP       = 100
-	CMD_VERSION    = 101
-	CMD_UPDATE     = 102
-	CMD_DELETE     = 103
-	CMD_COMPLETION = 110
 )
 
-// getEnv retrieves the value of the environment variable `key` or returns `defaultValue` if not set.
-func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+func main() {
+	app := &cli.App{
+		Name:     "lcg",
+		Usage:    "Linux Command GPT - Generate Linux commands from descriptions",
+		Version:  Version,
+		Commands: getCommands(),
+		UsageText: `
+lcg [global options] <command description>
+
+Examples:
+  lcg "I want to extract linux-command-gpt.tar.gz file"
+  lcg --file /path/to/file.txt "I want to list all directories with ls"
+`,
+		Description: `
+Linux Command GPT is a tool for generating Linux commands from natural language descriptions. 
+It supports reading parts of the prompt from files and allows saving, copying, or regenerating results.
+Additional commands are available for managing API keys.
+
+Environment Variables:
+  LCG_HOST          Endpoint for LLM API (default: http://192.168.87.108:11434/)
+  LCG_COMPLETIONS_PATH  Relative API path (default: api/chat)
+  LCG_MODEL         Model name (default: codegeex4)
+  LCG_PROMPT        Default prompt text
+  LCG_API_KEY_FILE  API key storage file (default: ~/.openai_api_key)
+  LCG_RESULT_FOLDER Results folder (default: ./gpt_results)
+`,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "file",
+				Aliases: []string{"f"},
+				Usage:   "Read part of the command from a file",
+			},
+			&cli.StringFlag{
+				Name:        "sys",
+				Aliases:     []string{"s"},
+				Usage:       "System prompt",
+				DefaultText: getEnv("LCG_PROMPT", "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks"),
+				Value:       getEnv("LCG_PROMPT", "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks"),
+			},
+		},
+		Action: func(c *cli.Context) error {
+			file := c.String("file")
+			system := c.String("sys")
+			args := c.Args().Slice()
+			if len(args) == 0 {
+				cli.ShowAppHelp(c)
+				return nil
+			}
+			executeMain(file, system, strings.Join(args, " "))
+			return nil
+		},
 	}
-	return defaultValue
+
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V", "v"},
+		Usage:   "prints out version",
+	}
+	cli.VersionPrinter = func(cCtx *cli.Context) {
+		fmt.Printf("%s\n", cCtx.App.Version)
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 }
 
-func handleCommand(cmd string) int {
-	if cmd == "" || cmd == "--help" || cmd == "-h" {
-		return CMD_HELP
+func getCommands() []*cli.Command {
+	return []*cli.Command{
+		{
+			Name:    "update-key",
+			Aliases: []string{"u"},
+			Usage:   "Update the API key",
+			Action: func(c *cli.Context) error {
+				gpt3 := initGPT()
+				gpt3.UpdateKey()
+				fmt.Println("API key updated.")
+				return nil
+			},
+		},
+		{
+			Name:    "delete-key",
+			Aliases: []string{"d"},
+			Usage:   "Delete the API key",
+			Action: func(c *cli.Context) error {
+				gpt3 := initGPT()
+				gpt3.DeleteKey()
+				fmt.Println("API key deleted.")
+				return nil
+			},
+		},
 	}
-	if cmd == "--version" || cmd == "-v" {
-		return CMD_VERSION
+}
+
+func executeMain(file, system, commandInput string) {
+	// fmt.Println(system, commandInput)
+	// os.Exit(0)
+	if file != "" {
+		if err := reader.FileToPrompt(&commandInput, file); err != nil {
+			fmt.Println("Error reading file:", err)
+			return
+		}
 	}
-	if cmd == "--update-key" || cmd == "-u" {
-		return CMD_UPDATE
+
+	if _, err := os.Stat(RESULT_FOLDER); os.IsNotExist(err) {
+		os.MkdirAll(RESULT_FOLDER, 0755)
 	}
-	if cmd == "--delete-key" || cmd == "-d" {
-		return CMD_DELETE
+
+	gpt3 := initGPT()
+
+	response, elapsed := getCommand(gpt3, commandInput)
+	if response == "" {
+		fmt.Println("No response received.")
+		return
 	}
-	return CMD_COMPLETION
+
+	fmt.Printf("Completed in %v seconds\n\n%s\n", elapsed, response)
+	handlePostResponse(response, gpt3, system, commandInput)
+}
+
+func initGPT() gpt.Gpt3 {
+	currentUser, _ := user.Current()
+	return gpt.Gpt3{
+		CompletionUrl: HOST + COMPLETIONS,
+		Model:         MODEL,
+		Prompt:        PROMPT,
+		HomeDir:       currentUser.HomeDir,
+		ApiKeyFile:    API_KEY_FILE,
+		Temperature:   0.01,
+	}
 }
 
 func getCommand(gpt3 gpt.Gpt3, cmd string) (string, float64) {
 	gpt3.InitKey()
-	s := time.Now()
+	start := time.Now()
 	done := make(chan bool)
 	go func() {
 		loadingChars := []rune{'-', '\\', '|', '/'}
@@ -112,113 +182,47 @@ func getCommand(gpt3 gpt.Gpt3, cmd string) (string, float64) {
 		}
 	}()
 
-	r := gpt3.Completions(cmd)
+	response := gpt3.Completions(cmd)
 	done <- true
-	elapsed := time.Since(s).Seconds()
-	elapsed = math.Round(elapsed*100) / 100
+	elapsed := math.Round(time.Since(start).Seconds()*100) / 100
 
-	if r == "" {
-		return "", elapsed
-	}
-	return r, elapsed
+	return response, elapsed
 }
 
-func main() {
-	currentUser, err := user.Current()
-	if err != nil {
-		panic(err)
+func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string) {
+	fmt.Print("\nOptions: (c)opy, (s)ave, (r)egenerate, (n)one: ")
+	var choice string
+	fmt.Scanln(&choice)
+
+	switch strings.ToLower(choice) {
+	case "c":
+		clipboard.WriteAll(response)
+		fmt.Println("Response copied to clipboard.")
+	case "s":
+		saveResponse(response, gpt3, cmd)
+	case "r":
+		executeMain("", system, cmd)
+	default:
+		fmt.Println("No action taken.")
 	}
+}
 
-	args := os.Args
-	cmd := ""
-	file := ""
-	if len(args) > 1 {
-		start := 1
-		if args[1] == "--file" || args[1] == "-f" {
-			file = args[2]
-			start = 3
-		}
-		cmd = strings.Join(args[start:], " ")
+func saveResponse(response string, gpt3 gpt.Gpt3, cmd string) {
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	filename := fmt.Sprintf("gpt_request_%s_%s.md", gpt3.Model, timestamp)
+	filePath := path.Join(RESULT_FOLDER, filename)
+	content := fmt.Sprintf("## Prompt:\n\n%s\n\n## Response:\n\n%s\n", cmd+". "+gpt3.Prompt, response)
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		fmt.Println("Failed to save response:", err)
+	} else {
+		fmt.Printf("Response saved to %s\n", filePath)
 	}
+}
 
-	if file != "" {
-		err := reader.FileToPrompt(&cmd, file)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
 	}
-
-	if _, err := os.Stat(RESULT_FOLDER); os.IsNotExist(err) {
-		os.MkdirAll(RESULT_FOLDER, 0755)
-	}
-
-	h := handleCommand(cmd)
-
-	if h == CMD_HELP {
-		fmt.Println(HELP)
-		return
-	}
-
-	if h == CMD_VERSION {
-		fmt.Println(VERSION)
-		return
-	}
-
-	gpt3 := gpt.Gpt3{
-		CompletionUrl: HOST + COMPLETIONS,
-		Model:         MODEL,
-		Prompt:        PROMPT,
-		HomeDir:       currentUser.HomeDir,
-		ApiKeyFile:    API_KEY_FILE,
-		Temperature:   0.01,
-	}
-
-	if h == CMD_UPDATE {
-		gpt3.UpdateKey()
-		return
-	}
-
-	if h == CMD_DELETE {
-		gpt3.DeleteKey()
-		return
-	}
-
-	c := "R"
-	r := ""
-	elapsed := 0.0
-	for c == "R" || c == "r" {
-		r, elapsed = getCommand(gpt3, cmd)
-		c = "N"
-		fmt.Printf("Completed in %v seconds\n\n", elapsed)
-		fmt.Println(r)
-		fmt.Print("\nDo you want to (c)opy, (s)ave to file, (r)egenerate, or take (N)o action on the command? (c/r/N): ")
-		fmt.Scanln(&c)
-
-		// no action
-		if c == "N" || c == "n" {
-			return
-		}
-	}
-
-	if r == "" {
-		return
-	}
-
-	// Copy to clipboard
-	if c == "C" || c == "c" {
-		clipboard.WriteAll(r)
-		fmt.Println("\033[33mCopied to clipboard")
-		return
-	}
-
-	if c == "S" || c == "s" {
-		timestamp := time.Now().Format("2006-01-02_15-04-05") // Format: YYYY-MM-DD_HH-MM-SS
-		filename := fmt.Sprintf("gpt_request_%s(%s).md", timestamp, gpt3.Model)
-		filePath := path.Join(RESULT_FOLDER, filename)
-		resultString := fmt.Sprintf("## Prompt:\n\n%s\n\n------------------\n\n## Response:\n\n%s\n\n", cmd+". "+gpt3.Prompt, r)
-		os.WriteFile(filePath, []byte(resultString), 0644)
-		fmt.Println("\033[33mSaved to file")
-		return
-	}
+	return defaultValue
 }
