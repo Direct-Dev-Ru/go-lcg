@@ -1,8 +1,11 @@
-## Linux Command GPT (lcg)
+# Linux Command GPT (lcg)
+
 Get Linux commands in natural language with the power of ChatGPT.
 
-### Installation
+## Installation
+
 Build from source
+
 ```bash
 > git clone --depth 1 https://github.com/asrul10/linux-command-gpt.git ~/.linux-command-gpt
 > cd ~/.linux-command-gpt
@@ -13,7 +16,7 @@ Build from source
 
 Or you can [download lcg executable file](https://github.com/asrul10/linux-command-gpt/releases)
 
-### Example Usage
+## Example Usage
 
 ```bash
 > lcg I want to extract linux-command-gpt.tar.gz file
@@ -39,24 +42,30 @@ for host in "${hosts[@]}"; do
   ssh $host "echo 'Hello, world!' > /tmp/hello.txt"
 done
 ```
+
 This script defines an array `hosts` that contains the names of the hosts to connect to. The loop iterates over each element in the array and uses the `ssh` command to execute a simple command on the remote host. In this case, the command is `echo 'Hello, world!' > /tmp/hello.txt`, which writes the string "Hello, world!" to a file called `/tmp/hello.txt`.
 
 You can modify the script to run any command you like by replacing the `echo` command with your desired command. For example, if you want to run a Python script on each host, you could use the following command:
+
 ```bash
 ssh $host "python /path/to/script.py"
 ```
+
 This will execute the Python script located at `/path/to/script.py` on the remote host.
 
 You can also modify the script to run multiple commands in a single SSH session by using the `&&` operator to chain the commands together. For example:
+
 ```bash
 ssh $host "echo 'Hello, world!' > /tmp/hello.txt && python /path/to/script.py"
 ```
+
 This will execute both the `echo` command and the Python script in a single SSH session.
 
 I hope this helps! Let me know if you have any questions or need further assistance.
 
 Do you want to (c)opy, (r)egenerate, or take (N)o action on the command? (c/r/N):
-```
+
+``` text
 
 To use the "copy to clipboard" feature, you need to install either the `xclip` or `xsel` package.
 
@@ -69,4 +78,25 @@ To use the "copy to clipboard" feature, you need to install either the `xclip` o
 --file        -f  read command from file
 --update-key  -u  update the API key
 --delete-key  -d  delete the API key
+
+# ollama example
+export LCG_PROVIDER=ollama
+export LCG_HOST=http://192.168.87.108:11434/
+export LCG_MODEL=codegeex4
+
+lcg "I want to extract linux-command-gpt.tar.gz file"
+
+export LCG_PROVIDER=proxy
+export LCG_HOST=http://localhost:8080
+export LCG_MODEL=GigaChat-2
+export LCG_JWT_TOKEN=your_jwt_token_here
+
+lcg "I want to extract linux-command-gpt.tar.gz file"
+
+lcg health
+
+lcg config
+
+lcg update-jwt
+
 ```

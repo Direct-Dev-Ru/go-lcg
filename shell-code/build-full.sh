@@ -4,7 +4,7 @@
 REPO=kuznetcovay/go-lcg
 VERSION=$1
 if [ -z "$VERSION" ]; then
-    VERSION=v1.0.1
+    VERSION=v1.1.0
 fi
 BRANCH=main
 

@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} golang:1.23-alpine AS build
+FROM --platform=${BUILDPLATFORM} golang:1.24.6-alpine3.22 AS build
 ARG TARGETOS
 ARG TARGETARCH
 RUN apk add git && go install mvdan.cc/garble@latest

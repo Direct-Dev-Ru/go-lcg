@@ -1,24 +1,40 @@
 package gpt
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+// ProxySimpleChatRequest структура для простого запроса
+type ProxySimpleChatRequest struct {
+	Message string `json:"message"`
+	Model   string `json:"model,omitempty"`
+}
+
+// ProxySimpleChatResponse структура ответа для простого запроса
+type ProxySimpleChatResponse struct {
+	Response string `json:"response"`
+	Usage    struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage,omitempty"`
+	Model   string `json:"model,omitempty"`
+	Timeout int    `json:"timeout_seconds,omitempty"`
+}
+
+// Gpt3 обновленная структура с поддержкой разных провайдеров
 type Gpt3 struct {
-	CompletionUrl string
-	Prompt        string
-	Model         string
-	HomeDir       string
-	ApiKeyFile    string
-	ApiKey        string
-	Temperature   float64
+	Provider     Provider
+	Prompt       string
+	Model        string
+	HomeDir      string
+	ApiKeyFile   string
+	ApiKey       string
+	Temperature  float64
+	ProviderType string // "ollama", "proxy"
 }
 
 type Chat struct {
@@ -135,6 +151,11 @@ func (gpt3 *Gpt3) DeleteKey() {
 }
 
 func (gpt3 *Gpt3) InitKey() {
+	// Для proxy провайдера не нужен API ключ, используется JWT токен
+	if gpt3.ProviderType == "proxy" {
+		return
+	}
+
 	load := gpt3.loadApiKey()
 	if load {
 		return
@@ -145,55 +166,46 @@ func (gpt3 *Gpt3) InitKey() {
 	gpt3.storeApiKey(apiKey)
 }
 
-func (gpt3 *Gpt3) Completions(ask string) string {
-	req, err := http.NewRequest("POST", gpt3.CompletionUrl, nil)
-	if err != nil {
-		panic(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(gpt3.ApiKey))
+// NewGpt3 создает новый экземпляр GPT с выбранным провайдером
+func NewGpt3(providerType, host, apiKey, model, prompt string, temperature float64) *Gpt3 {
+	var provider Provider
 
+	switch providerType {
+	case "proxy":
+		provider = NewProxyAPIProvider(host, apiKey, model) // apiKey используется как JWT токен
+	case "ollama":
+		provider = NewOllamaProvider(host, model, temperature)
+	default:
+		provider = NewOllamaProvider(host, model, temperature)
+	}
+
+	return &Gpt3{
+		Provider:     provider,
+		Prompt:       prompt,
+		Model:        model,
+		ApiKey:       apiKey,
+		Temperature:  temperature,
+		ProviderType: providerType,
+	}
+}
+
+// Completions обновленный метод с поддержкой разных провайдеров
+func (gpt3 *Gpt3) Completions(ask string) string {
 	messages := []Chat{
 		{"system", gpt3.Prompt},
-		{"user", ask + "." + gpt3.Prompt},
-	}
-	payload := Gpt3Request{
-		Model:    gpt3.Model,
-		Messages: messages,
-		Stream:   false,
-		Options:  Gpt3Options{gpt3.Temperature},
+		{"user", ask + ". " + gpt3.Prompt},
 	}
 
-	payloadJson, err := json.Marshal(payload)
+	response, err := gpt3.Provider.Chat(messages)
 	if err != nil {
-		panic(err)
-	}
-	req.Body = io.NopCloser(bytes.NewBuffer(payloadJson))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		fmt.Println(string(body))
+		fmt.Printf("Ошибка при выполнении запроса: %v\n", err)
 		return ""
 	}
 
-	// var res Gpt3Response
-	var res OllamaResponse
-	err = json.Unmarshal(body, &res)
-	if err != nil {
-		panic(err)
-	}
+	return response
+}
 
-	// return strings.TrimSpace(res.Choices[0].Message.Content)
-	return strings.TrimSpace(res.Message.Content)
+// Health проверяет состояние провайдера
+func (gpt3 *Gpt3) Health() error {
+	return gpt3.Provider.Health()
 }
