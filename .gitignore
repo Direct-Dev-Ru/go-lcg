@@ -14,3 +14,4 @@ bin-linux-amd64/*
 bin-linux-arm64/*
 binaries-for-upload/*
 gpt_results
+shell-code/jwt.admin.token

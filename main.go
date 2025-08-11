@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ var (
 	RESULT_FOLDER = getEnv("LCG_RESULT_FOLDER", path.Join(cwd, "gpt_results"))
 	PROVIDER_TYPE = getEnv("LCG_PROVIDER", "ollama") // "ollama", "proxy"
 	JWT_TOKEN     = getEnv("LCG_JWT_TOKEN", "")
+	PROMPT_ID     = getEnv("LCG_PROMPT_ID", "1") // ID промпта по умолчанию
+	TIMEOUT       = getEnv("LCG_TIMEOUT", "120") // Таймаут в секундах по умолчанию
 )
 
 const (
@@ -76,21 +79,50 @@ Linux Command GPT - инструмент для генерации Linux ком�
 			&cli.StringFlag{
 				Name:        "sys",
 				Aliases:     []string{"s"},
-				Usage:       "System prompt",
-				DefaultText: getEnv("LCG_PROMPT", "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks"),
-				Value:       getEnv("LCG_PROMPT", "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks"),
+				Usage:       "System prompt content or ID",
+				DefaultText: "Use prompt ID from LCG_PROMPT_ID or default prompt",
+				Value:       "",
+			},
+			&cli.IntFlag{
+				Name:        "prompt-id",
+				Aliases:     []string{"pid"},
+				Usage:       "System prompt ID (1-5 for default prompts)",
+				DefaultText: "1",
+				Value:       1,
+			},
+			&cli.IntFlag{
+				Name:        "timeout",
+				Aliases:     []string{"t"},
+				Usage:       "Request timeout in seconds",
+				DefaultText: "120",
+				Value:       120,
 			},
 		},
 		Action: func(c *cli.Context) error {
 			file := c.String("file")
 			system := c.String("sys")
+			promptID := c.Int("prompt-id")
+			timeout := c.Int("timeout")
 			args := c.Args().Slice()
+
 			if len(args) == 0 {
 				cli.ShowAppHelp(c)
 				showTips()
 				return nil
 			}
-			executeMain(file, system, strings.Join(args, " "))
+
+			// Если указан prompt-id, загружаем соответствующий промпт
+			if system == "" && promptID > 0 {
+				currentUser, _ := user.Current()
+				pm := gpt.NewPromptManager(currentUser.HomeDir)
+				if prompt, err := pm.GetPromptByID(promptID); err == nil {
+					system = prompt.Content
+				} else {
+					fmt.Printf("Warning: Prompt ID %d not found, using default prompt\n", promptID)
+				}
+			}
+
+			executeMain(file, system, strings.Join(args, " "), timeout)
 			return nil
 		},
 	}
@@ -117,7 +149,15 @@ func getCommands() []*cli.Command {
 			Aliases: []string{"u"},
 			Usage:   "Update the API key",
 			Action: func(c *cli.Context) error {
-				gpt3 := initGPT(PROMPT)
+				if PROVIDER_TYPE == "ollama" || PROVIDER_TYPE == "proxy" {
+					fmt.Println("API key is not needed for ollama and proxy providers")
+					return nil
+				}
+				timeout := 120 // default timeout
+				if t, err := strconv.Atoi(TIMEOUT); err == nil {
+					timeout = t
+				}
+				gpt3 := initGPT(PROMPT, timeout)
 				gpt3.UpdateKey()
 				fmt.Println("API key updated.")
 				return nil
@@ -128,7 +168,15 @@ func getCommands() []*cli.Command {
 			Aliases: []string{"d"},
 			Usage:   "Delete the API key",
 			Action: func(c *cli.Context) error {
-				gpt3 := initGPT(PROMPT)
+				if PROVIDER_TYPE == "ollama" || PROVIDER_TYPE == "proxy" {
+					fmt.Println("API key is not needed for ollama and proxy providers")
+					return nil
+				}
+				timeout := 120 // default timeout
+				if t, err := strconv.Atoi(TIMEOUT); err == nil {
+					timeout = t
+				}
+				gpt3 := initGPT(PROMPT, timeout)
 				gpt3.DeleteKey()
 				fmt.Println("API key deleted.")
 				return nil
@@ -181,11 +229,38 @@ func getCommands() []*cli.Command {
 			},
 		},
 		{
+			Name:    "models",
+			Aliases: []string{"m"},
+			Usage:   "Show available models",
+			Action: func(c *cli.Context) error {
+				timeout := 120 // default timeout
+				if t, err := strconv.Atoi(TIMEOUT); err == nil {
+					timeout = t
+				}
+				gpt3 := initGPT(PROMPT, timeout)
+				models, err := gpt3.GetAvailableModels()
+				if err != nil {
+					fmt.Printf("Ошибка получения моделей: %v\n", err)
+					return err
+				}
+
+				fmt.Printf("Доступные модели для провайдера %s:\n", PROVIDER_TYPE)
+				for i, model := range models {
+					fmt.Printf("  %d. %s\n", i+1, model)
+				}
+				return nil
+			},
+		},
+		{
 			Name:    "health",
 			Aliases: []string{"he"}, // Изменено с "h" на "he"
 			Usage:   "Check API health",
 			Action: func(c *cli.Context) error {
-				gpt3 := initGPT(PROMPT)
+				timeout := 120 // default timeout
+				if t, err := strconv.Atoi(TIMEOUT); err == nil {
+					timeout = t
+				}
+				gpt3 := initGPT(PROMPT, timeout)
 				if err := gpt3.Health(); err != nil {
 					fmt.Printf("Health check failed: %v\n", err)
 					return err
@@ -203,6 +278,7 @@ func getCommands() []*cli.Command {
 				fmt.Printf("Host: %s\n", HOST)
 				fmt.Printf("Model: %s\n", MODEL)
 				fmt.Printf("Prompt: %s\n", PROMPT)
+				fmt.Printf("Timeout: %s seconds\n", TIMEOUT)
 				if PROVIDER_TYPE == "proxy" {
 					fmt.Printf("JWT Token: %s\n", func() string {
 						if JWT_TOKEN != "" {
@@ -228,15 +304,136 @@ func getCommands() []*cli.Command {
 				return nil
 			},
 		},
+		{
+			Name:    "prompts",
+			Aliases: []string{"p"},
+			Usage:   "Manage system prompts",
+			Subcommands: []*cli.Command{
+				{
+					Name:    "list",
+					Aliases: []string{"l"},
+					Usage:   "List all available prompts",
+					Action: func(c *cli.Context) error {
+						currentUser, _ := user.Current()
+						pm := gpt.NewPromptManager(currentUser.HomeDir)
+						pm.ListPrompts()
+						return nil
+					},
+				},
+				{
+					Name:    "add",
+					Aliases: []string{"a"},
+					Usage:   "Add a new custom prompt",
+					Action: func(c *cli.Context) error {
+						currentUser, _ := user.Current()
+						pm := gpt.NewPromptManager(currentUser.HomeDir)
+
+						var name, description, content string
+
+						fmt.Print("Название промпта: ")
+						fmt.Scanln(&name)
+
+						fmt.Print("Описание: ")
+						fmt.Scanln(&description)
+
+						fmt.Print("Содержание промпта: ")
+						fmt.Scanln(&content)
+
+						if err := pm.AddCustomPrompt(name, description, content); err != nil {
+							fmt.Printf("Ошибка добавления промпта: %v\n", err)
+							return err
+						}
+
+						fmt.Println("Промпт успешно добавлен!")
+						return nil
+					},
+				},
+				{
+					Name:    "delete",
+					Aliases: []string{"d"},
+					Usage:   "Delete a custom prompt",
+					Action: func(c *cli.Context) error {
+						if c.NArg() == 0 {
+							fmt.Println("Укажите ID промпта для удаления")
+							return nil
+						}
+
+						var id int
+						if _, err := fmt.Sscanf(c.Args().First(), "%d", &id); err != nil {
+							fmt.Println("Неверный ID промпта")
+							return err
+						}
+
+						currentUser, _ := user.Current()
+						pm := gpt.NewPromptManager(currentUser.HomeDir)
+
+						if err := pm.DeleteCustomPrompt(id); err != nil {
+							fmt.Printf("Ошибка удаления промпта: %v\n", err)
+							return err
+						}
+
+						fmt.Println("Промпт успешно удален!")
+						return nil
+					},
+				},
+			},
+		},
+		{
+			Name:    "test-prompt",
+			Aliases: []string{"tp"},
+			Usage:   "Test a specific prompt ID",
+			Action: func(c *cli.Context) error {
+				if c.NArg() == 0 {
+					fmt.Println("Usage: lcg test-prompt <prompt-id> <command>")
+					return nil
+				}
+
+				var promptID int
+				if _, err := fmt.Sscanf(c.Args().First(), "%d", &promptID); err != nil {
+					fmt.Println("Invalid prompt ID")
+					return err
+				}
+
+				currentUser, _ := user.Current()
+				pm := gpt.NewPromptManager(currentUser.HomeDir)
+
+				prompt, err := pm.GetPromptByID(promptID)
+				if err != nil {
+					fmt.Printf("Prompt ID %d not found\n", promptID)
+					return err
+				}
+
+				fmt.Printf("Testing prompt ID %d: %s\n", promptID, prompt.Name)
+				fmt.Printf("Description: %s\n", prompt.Description)
+				fmt.Printf("Content: %s\n", prompt.Content)
+
+				if len(c.Args().Slice()) > 1 {
+					command := strings.Join(c.Args().Slice()[1:], " ")
+					fmt.Printf("\nTesting with command: %s\n", command)
+					timeout := 120 // default timeout
+					if t, err := strconv.Atoi(TIMEOUT); err == nil {
+						timeout = t
+					}
+					executeMain("", prompt.Content, command, timeout)
+				}
+
+				return nil
+			},
+		},
 	}
 }
 
-func executeMain(file, system, commandInput string) {
+func executeMain(file, system, commandInput string, timeout int) {
 	if file != "" {
 		if err := reader.FileToPrompt(&commandInput, file); err != nil {
 			printColored(fmt.Sprintf("❌ Ошибка чтения файла: %v\n", err), colorRed)
 			return
 		}
+	}
+
+	// Если system пустой, используем дефолтный промпт
+	if system == "" {
+		system = PROMPT
 	}
 
 	if _, err := os.Stat(RESULT_FOLDER); os.IsNotExist(err) {
@@ -246,7 +443,7 @@ func executeMain(file, system, commandInput string) {
 		}
 	}
 
-	gpt3 := initGPT(system)
+	gpt3 := initGPT(system, timeout)
 
 	printColored("🤖 Запрос: ", colorCyan)
 	fmt.Printf("%s\n", commandInput)
@@ -265,7 +462,7 @@ func executeMain(file, system, commandInput string) {
 	handlePostResponse(response, gpt3, system, commandInput)
 }
 
-func initGPT(system string) gpt.Gpt3 {
+func initGPT(system string, timeout int) gpt.Gpt3 {
 	currentUser, _ := user.Current()
 
 	// Загружаем JWT токен в зависимости от провайдера
@@ -281,7 +478,7 @@ func initGPT(system string) gpt.Gpt3 {
 		}
 	}
 
-	return *gpt.NewGpt3(PROVIDER_TYPE, HOST, jwtToken, MODEL, system, 0.01)
+	return *gpt.NewGpt3(PROVIDER_TYPE, HOST, jwtToken, MODEL, system, 0.01, timeout)
 }
 
 func getCommand(gpt3 gpt.Gpt3, cmd string) (string, float64) {
@@ -326,7 +523,7 @@ func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string) {
 		saveResponse(response, gpt3, cmd)
 	case "r":
 		fmt.Println("🔄 Перегенерирую...")
-		executeMain("", system, cmd)
+		executeMain("", system, cmd, 120) // Use default timeout for regeneration
 	case "e":
 		executeCommand(response)
 	default:
@@ -420,6 +617,9 @@ func showTips() {
 	printColored("💡 Подсказки:\n", colorCyan)
 	fmt.Println("   • Используйте --file для чтения из файла")
 	fmt.Println("   • Используйте --sys для изменения системного промпта")
+	fmt.Println("   • Используйте --prompt-id для выбора предустановленного промпта")
+	fmt.Println("   • Используйте --timeout для установки таймаута запроса")
+	fmt.Println("   • Команда 'prompts list' покажет все доступные промпты")
 	fmt.Println("   • Команда 'history' покажет историю запросов")
 	fmt.Println("   • Команда 'config' покажет текущие настройки")
 	fmt.Println("   • Команда 'health' проверит доступность API")

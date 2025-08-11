@@ -14,6 +14,7 @@ import (
 type Provider interface {
 	Chat(messages []Chat) (string, error)
 	Health() error
+	GetAvailableModels() ([]string, error)
 }
 
 // ProxyAPIProvider реализация для прокси API (gin-restapi)
@@ -66,21 +67,30 @@ type OllamaProvider struct {
 	HTTPClient  *http.Client
 }
 
-func NewProxyAPIProvider(baseURL, jwtToken, model string) *ProxyAPIProvider {
+// OllamaTagsResponse структура ответа для получения списка моделей
+type OllamaTagsResponse struct {
+	Models []struct {
+		Name       string `json:"name"`
+		ModifiedAt string `json:"modified_at"`
+		Size       int64  `json:"size"`
+	} `json:"models"`
+}
+
+func NewProxyAPIProvider(baseURL, jwtToken, model string, timeout int) *ProxyAPIProvider {
 	return &ProxyAPIProvider{
 		BaseURL:    strings.TrimSuffix(baseURL, "/"),
 		JWTToken:   jwtToken,
 		Model:      model,
-		HTTPClient: &http.Client{Timeout: 120 * time.Second},
+		HTTPClient: &http.Client{Timeout: time.Duration(timeout) * time.Second},
 	}
 }
 
-func NewOllamaProvider(baseURL, model string, temperature float64) *OllamaProvider {
+func NewOllamaProvider(baseURL, model string, temperature float64, timeout int) *OllamaProvider {
 	return &OllamaProvider{
 		BaseURL:     strings.TrimSuffix(baseURL, "/"),
 		Model:       model,
 		Temperature: temperature,
-		HTTPClient:  &http.Client{Timeout: 120 * time.Second},
+		HTTPClient:  &http.Client{Timeout: time.Duration(timeout) * time.Second},
 	}
 }
 
@@ -88,12 +98,12 @@ func NewOllamaProvider(baseURL, model string, temperature float64) *OllamaProvid
 func (p *ProxyAPIProvider) Chat(messages []Chat) (string, error) {
 	// Используем основной endpoint /api/v1/protected/sberchat/chat
 	payload := ProxyChatRequest{
-		Messages:    messages,
-		Model:       p.Model,
-		Temperature: 0.5,
-		TopP:        0.5,
-		Stream:      false,
-		RandomWords: []string{"linux", "command", "gpt"},
+		Messages:       messages,
+		Model:          p.Model,
+		Temperature:    0.5,
+		TopP:           0.5,
+		Stream:         false,
+		RandomWords:    []string{"linux", "command", "gpt"},
 		FallbackString: "I'm sorry, I can't help with that. Please try again.",
 	}
 
@@ -243,4 +253,44 @@ func (o *OllamaProvider) Health() error {
 	}
 
 	return nil
+}
+
+// GetAvailableModels для ProxyAPIProvider возвращает фиксированный список
+func (p *ProxyAPIProvider) GetAvailableModels() ([]string, error) {
+	return []string{"GigaChat-2", "GigaChat-2-Pro", "GigaChat-2-Max"}, nil
+}
+
+// GetAvailableModels возвращает список доступных моделей для провайдера
+func (o *OllamaProvider) GetAvailableModels() ([]string, error) {
+	req, err := http.NewRequest("GET", o.BaseURL+"/api/tags", nil)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка создания запроса: %w", err)
+	}
+
+	resp, err := o.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения моделей: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка чтения ответа: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ошибка API: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var response OllamaTagsResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("ошибка парсинга ответа: %w", err)
+	}
+
+	var models []string
+	for _, model := range response.Models {
+		models = append(models, model.Name)
+	}
+
+	return models, nil
 }

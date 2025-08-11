@@ -151,8 +151,8 @@ func (gpt3 *Gpt3) DeleteKey() {
 }
 
 func (gpt3 *Gpt3) InitKey() {
-	// Для proxy провайдера не нужен API ключ, используется JWT токен
-	if gpt3.ProviderType == "proxy" {
+	// Для ollama и proxy провайдеров не нужен API ключ
+	if gpt3.ProviderType == "ollama" || gpt3.ProviderType == "proxy" {
 		return
 	}
 
@@ -167,16 +167,16 @@ func (gpt3 *Gpt3) InitKey() {
 }
 
 // NewGpt3 создает новый экземпляр GPT с выбранным провайдером
-func NewGpt3(providerType, host, apiKey, model, prompt string, temperature float64) *Gpt3 {
+func NewGpt3(providerType, host, apiKey, model, prompt string, temperature float64, timeout int) *Gpt3 {
 	var provider Provider
 
 	switch providerType {
 	case "proxy":
-		provider = NewProxyAPIProvider(host, apiKey, model) // apiKey используется как JWT токен
+		provider = NewProxyAPIProvider(host, apiKey, model, timeout) // apiKey используется как JWT токен
 	case "ollama":
-		provider = NewOllamaProvider(host, model, temperature)
+		provider = NewOllamaProvider(host, model, temperature, timeout)
 	default:
-		provider = NewOllamaProvider(host, model, temperature)
+		provider = NewOllamaProvider(host, model, temperature, timeout)
 	}
 
 	return &Gpt3{
@@ -208,4 +208,9 @@ func (gpt3 *Gpt3) Completions(ask string) string {
 // Health проверяет состояние провайдера
 func (gpt3 *Gpt3) Health() error {
 	return gpt3.Provider.Health()
+}
+
+// GetAvailableModels возвращает список доступных моделей
+func (gpt3 *Gpt3) GetAvailableModels() ([]string, error) {
+	return gpt3.Provider.GetAvailableModels()
 }
