@@ -16,7 +16,7 @@ export GOCACHE="${HOME}/.cache/go-build"
 CURRENT_BRANCH=$(git branch --show-current)
 
 # Function to restore the original branch
-function restore_branch {
+restore_branch() {
         echo "Restoring original branch: ${CURRENT_BRANCH}"
         git checkout "${CURRENT_BRANCH}"
 }
