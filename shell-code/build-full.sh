@@ -9,7 +9,7 @@ readonly BRANCH="main"
 readonly BINARY_NAME="lcg"
 
 # Получаем версию из аргумента или используем значение по умолчанию
-VERSION="${1:-v1.1.0}"
+VERSION="${1:-v2.0.0}"
 
 # Цвета для вывода
 readonly RED='\033[0;31m'
