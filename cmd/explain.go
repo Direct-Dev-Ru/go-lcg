@@ -25,17 +25,86 @@ type ExplainDeps struct {
 
 // ShowDetailedExplanation делает дополнительный запрос с подробным описанием и альтернативами
 func ShowDetailedExplanation(command string, gpt3 gpt.Gpt3, system, originalCmd string, timeout int, level int, deps ExplainDeps) {
-	var detailedSystem string
-	switch level {
-	case 1: // v — кратко
-		detailedSystem = "Ты опытный Linux-инженер. Объясни КРАТКО, по делу: что делает команда и самые важные ключи. Без сравнений и альтернатив. Минимум текста. Пиши на русском."
-	case 2: // vv — средне
-		detailedSystem = "Ты опытный Linux-инженер. Дай сбалансированное объяснение: назначение команды, разбор основных ключей, 1-2 примера. Кратко упомяни 1-2 альтернативы без глубокого сравнения. Пиши на русском."
-	default: // vvv — максимально подробно
-		detailedSystem = "Ты опытный Linux-инженер. Дай подробное объяснение команды с полным разбором ключей, подкоманд, сценариев применения, примеров. Затем предложи альтернативные способы решения задачи другой командой/инструментами (со сравнениями и когда что лучше применять). Пиши на русском."
+	// Получаем домашнюю директорию пользователя
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback к встроенным промптам
+		detailedSystem := getBuiltinVerbosePrompt(level)
+		ask := getBuiltinAsk(originalCmd, command)
+		processExplanation(detailedSystem, ask, gpt3, timeout, deps, originalCmd, command, system, level)
+		return
 	}
 
-	ask := fmt.Sprintf("Объясни подробно команду и предложи альтернативы. Исходная команда: %s. Исходное задание пользователя: %s", command, originalCmd)
+	// Создаем менеджер промптов
+	pm := gpt.NewPromptManager(homeDir)
+
+	// Получаем промпт подробности по уровню
+	verbosePrompt := getVerbosePromptByLevel(pm.Prompts, level)
+
+	// Формируем ask в зависимости от языка
+	ask := getAskByLanguage(pm.GetCurrentLanguage(), originalCmd, command)
+
+	processExplanation(verbosePrompt, ask, gpt3, timeout, deps, originalCmd, command, system, level)
+}
+
+// getVerbosePromptByLevel возвращает промпт подробности по уровню
+func getVerbosePromptByLevel(prompts []gpt.SystemPrompt, level int) string {
+	// Ищем промпт подробности по ID
+	for _, prompt := range prompts {
+		if prompt.ID >= 6 && prompt.ID <= 8 {
+			switch level {
+			case 1: // v
+				if prompt.ID == 6 {
+					return prompt.Content
+				}
+			case 2: // vv
+				if prompt.ID == 7 {
+					return prompt.Content
+				}
+			default: // vvv
+				if prompt.ID == 8 {
+					return prompt.Content
+				}
+			}
+		}
+	}
+
+	// Fallback к встроенным промптам
+	return getBuiltinVerbosePrompt(level)
+}
+
+// getBuiltinVerbosePrompt возвращает встроенный промпт подробности
+func getBuiltinVerbosePrompt(level int) string {
+	switch level {
+	case 1: // v — кратко
+		return "Ты опытный Linux-инженер. Объясни КРАТКО, по делу: что делает команда и самые важные ключи. Без сравнений и альтернатив. Минимум текста. Пиши на русском."
+	case 2: // vv — средне
+		return "Ты опытный Linux-инженер. Дай сбалансированное объяснение: назначение команды, разбор основных ключей, 1-2 примера. Кратко упомяни 1-2 альтернативы без глубокого сравнения. Пиши на русском."
+	default: // vvv — максимально подробно
+		return "Ты опытный Linux-инженер. Дай подробное объяснение команды с полным разбором ключей, подкоманд, сценариев применения, примеров. Затем предложи альтернативные способы решения задачи другой командой/инструментами (со сравнениями и когда что лучше применять). Пиши на русском."
+	}
+}
+
+// getAskByLanguage формирует ask в зависимости от языка
+func getAskByLanguage(lang, originalCmd, command string) string {
+	if lang == "ru" {
+		return fmt.Sprintf("Объясни подробно команду и предложи альтернативы. Исходная команда: %s. Исходное задание пользователя: %s", command, originalCmd)
+	}
+	// Английский
+	return fmt.Sprintf("Explain the command in detail and suggest alternatives. Original command: %s. Original user request: %s", command, originalCmd)
+}
+
+// getBuiltinAsk возвращает встроенный ask
+func getBuiltinAsk(originalCmd, command string) string {
+	return fmt.Sprintf("Объясни подробно команду и предложи альтернативы. Исходная команда: %s. Исходное задание пользователя: %s", command, originalCmd)
+}
+
+// processExplanation обрабатывает объяснение
+func processExplanation(detailedSystem, ask string, gpt3 gpt.Gpt3, timeout int, deps ExplainDeps, originalCmd string, command string, system string, level int) {
+	// Выводим debug информацию если включен флаг
+	if config.AppConfig.MainFlags.Debug {
+		printVerboseDebugInfo(detailedSystem, ask, gpt3, timeout, level)
+	}
 	detailed := gpt.NewGpt3(gpt3.ProviderType, config.AppConfig.Host, gpt3.ApiKey, gpt3.Model, detailedSystem, 0.2, timeout)
 
 	deps.PrintColored("\n🧠 Получаю подробное объяснение...\n", deps.ColorPurple)
@@ -104,4 +173,17 @@ func truncateTitle(s string) string {
 		return s
 	}
 	return string(r[:head]) + " ..."
+}
+
+// printVerboseDebugInfo выводит отладочную информацию для режимов v/vv/vvv
+func printVerboseDebugInfo(detailedSystem, ask string, gpt3 gpt.Gpt3, timeout int, level int) {
+	fmt.Printf("\n🔍 DEBUG VERBOSE (v%d):\n", level)
+	fmt.Printf("📝 Системный промпт подробности:\n%s\n", detailedSystem)
+	fmt.Printf("💬 Запрос подробности:\n%s\n", ask)
+	fmt.Printf("⏱️  Таймаут: %d сек\n", timeout)
+	fmt.Printf("🌐 Провайдер: %s\n", gpt3.ProviderType)
+	fmt.Printf("🏠 Хост: %s\n", config.AppConfig.Host)
+	fmt.Printf("🧠 Модель: %s\n", gpt3.Model)
+	fmt.Printf("🎯 Уровень подробности: %d\n", level)
+	fmt.Printf("────────────────────────────────────────\n")
 }

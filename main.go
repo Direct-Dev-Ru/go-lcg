@@ -27,6 +27,9 @@ var Version string
 // disableHistory управляет записью/обновлением истории на уровне процесса (флаг имеет приоритет над env)
 var disableHistory bool
 
+// fromHistory указывает, что текущий ответ взят из истории
+var fromHistory bool
+
 const (
 	colorRed    = "\033[31m"
 	colorGreen  = "\033[32m"
@@ -40,6 +43,13 @@ const (
 
 func main() {
 	_ = colorBlue
+
+	gpt.InitBuiltinPrompts("")
+
+	// Авто-инициализация sys_prompts при старте CLI (создаст файл при отсутствии)
+	if currentUser, err := user.Current(); err == nil {
+		_ = gpt.NewPromptManager(currentUser.HomeDir)
+	}
 
 	app := &cli.App{
 		Name:     "lcg",
@@ -97,6 +107,12 @@ Linux Command GPT - инструмент для генерации Linux ком�
 				DefaultText: "120",
 				Value:       120,
 			},
+			&cli.BoolFlag{
+				Name:    "debug",
+				Aliases: []string{"d"},
+				Usage:   "Show debug information (request parameters and prompts)",
+				Value:   false,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			file := c.String("file")
@@ -117,6 +133,7 @@ Linux Command GPT - инструмент для генерации Linux ком�
 				Sys:       system,
 				PromptID:  promptID,
 				Timeout:   timeout,
+				Debug:     c.Bool("debug"),
 			}
 			disableHistory = config.AppConfig.MainFlags.NoHistory || config.AppConfig.IsNoHistoryEnabled()
 			args := c.Args().Slice()
@@ -384,10 +401,18 @@ func getCommands() []*cli.Command {
 					Name:    "list",
 					Aliases: []string{"l"},
 					Usage:   "List all available prompts",
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "full",
+							Aliases: []string{"f"},
+							Usage:   "Show full content without truncation",
+						},
+					},
 					Action: func(c *cli.Context) error {
 						currentUser, _ := user.Current()
 						pm := gpt.NewPromptManager(currentUser.HomeDir)
-						pm.ListPrompts()
+						full := c.Bool("full")
+						pm.ListPromptsWithFull(full)
 						return nil
 					},
 				},
@@ -491,10 +516,43 @@ func getCommands() []*cli.Command {
 				return nil
 			},
 		},
+		{
+			Name:    "serve-result",
+			Aliases: []string{"serve"},
+			Usage:   "Start HTTP server to browse saved results",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "port",
+					Aliases: []string{"p"},
+					Usage:   "Server port",
+					Value:   config.AppConfig.Server.Port,
+				},
+				&cli.StringFlag{
+					Name:    "host",
+					Aliases: []string{"H"},
+					Usage:   "Server host",
+					Value:   config.AppConfig.Server.Host,
+				},
+			},
+			Action: func(c *cli.Context) error {
+				port := c.String("port")
+				host := c.String("host")
+
+				printColored(fmt.Sprintf("🌐 Запускаю HTTP сервер на %s:%s\n", host, port), colorCyan)
+				printColored(fmt.Sprintf("📁 Папка результатов: %s\n", config.AppConfig.ResultFolder), colorYellow)
+				printColored(fmt.Sprintf("🔗 Откройте в браузере: http://%s:%s\n", host, port), colorGreen)
+
+				return cmdPackage.StartResultServer(host, port)
+			},
+		},
 	}
 }
 
 func executeMain(file, system, commandInput string, timeout int) {
+	// Выводим debug информацию если включен флаг
+	if config.AppConfig.MainFlags.Debug {
+		printDebugInfo(file, system, commandInput, timeout)
+	}
 	if file != "" {
 		if err := reader.FileToPrompt(&commandInput, file); err != nil {
 			printColored(fmt.Sprintf("❌ Ошибка чтения файла: %v\n", err), colorRed)
@@ -518,6 +576,7 @@ func executeMain(file, system, commandInput string, timeout int) {
 	// Проверка истории: если такой запрос уже встречался — предложить открыть из истории
 	if !disableHistory {
 		if found, hist := cmdPackage.CheckAndSuggestFromHistory(config.AppConfig.ResultHistory, commandInput); found && hist != nil {
+			fromHistory = true // Устанавливаем флаг, что ответ из истории
 			gpt3 := initGPT(system, timeout)
 			printColored("\nВНИМАНИЕ: ОТВЕТ СФОРМИРОВАН ИИ. ТРЕБУЕТСЯ ПРОВЕРКА И КРИТИЧЕСКИЙ АНАЛИЗ. ВОЗМОЖНЫ ОШИБКИ И ГАЛЛЮЦИНАЦИИ.\n", colorRed)
 			printColored("\n📋 Команда (из истории):\n", colorYellow)
@@ -527,7 +586,7 @@ func executeMain(file, system, commandInput string, timeout int) {
 				fmt.Println(hist.Explanation)
 			}
 			// Показали из истории — не выполняем запрос к API, сразу меню действий
-			handlePostResponse(hist.Response, gpt3, system, commandInput, timeout)
+			handlePostResponse(hist.Response, gpt3, system, commandInput, timeout, hist.Explanation)
 			return
 		}
 	}
@@ -553,7 +612,8 @@ func executeMain(file, system, commandInput string, timeout int) {
 
 	// Сохраняем в историю (после завершения работы – т.е. позже, в зависимости от выбора действия)
 	// Здесь не сохраняем, чтобы учесть правило: сохранять после действия, отличного от v/vv/vvv
-	handlePostResponse(response, gpt3, system, commandInput, timeout)
+	fromHistory = false // Сбрасываем флаг для новых запросов
+	handlePostResponse(response, gpt3, system, commandInput, timeout, "")
 }
 
 // checkAndSuggestFromHistory проверяет файл истории и при совпадении запроса предлагает показать сохраненный результат
@@ -607,7 +667,7 @@ func getCommand(gpt3 gpt.Gpt3, cmd string) (string, float64) {
 	return response, elapsed
 }
 
-func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, timeout int) {
+func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, timeout int, explanation string) {
 	fmt.Printf("Действия: (c)копировать, (s)сохранить, (r)перегенерировать, (e)выполнить, (v|vv|vvv)подробно, (n)ничего: ")
 	var choice string
 	fmt.Scanln(&choice)
@@ -617,12 +677,24 @@ func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, time
 		clipboard.WriteAll(response)
 		fmt.Println("✅ Команда скопирована в буфер обмена")
 		if !disableHistory {
-			cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			if fromHistory {
+				cmdPackage.SaveToHistoryFromHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt, explanation)
+			} else {
+				cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			}
 		}
 	case "s":
-		saveResponse(response, gpt3.Model, gpt3.Prompt, cmd)
+		if fromHistory && strings.TrimSpace(explanation) != "" {
+			saveResponse(response, gpt3.Model, gpt3.Prompt, cmd, explanation)
+		} else {
+			saveResponse(response, gpt3.Model, gpt3.Prompt, cmd)
+		}
 		if !disableHistory {
-			cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			if fromHistory {
+				cmdPackage.SaveToHistoryFromHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt, explanation)
+			} else {
+				cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			}
 		}
 	case "r":
 		fmt.Println("🔄 Перегенерирую...")
@@ -630,7 +702,11 @@ func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, time
 	case "e":
 		executeCommand(response)
 		if !disableHistory {
-			cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			if fromHistory {
+				cmdPackage.SaveToHistoryFromHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt, explanation)
+			} else {
+				cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			}
 		}
 	case "v", "vv", "vvv":
 		level := len(choice) // 1, 2, 3
@@ -647,7 +723,11 @@ func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, time
 	default:
 		fmt.Println(" До свидания!")
 		if !disableHistory {
-			cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			if fromHistory {
+				cmdPackage.SaveToHistoryFromHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt, explanation)
+			} else {
+				cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+			}
 		}
 	}
 }
@@ -702,4 +782,19 @@ func showTips() {
 	fmt.Println("   • Команда 'history list' покажет историю запросов")
 	fmt.Println("   • Команда 'config' покажет текущие настройки")
 	fmt.Println("   • Команда 'health' проверит доступность API")
+	fmt.Println("   • Команда 'serve-result' запустит HTTP сервер для просмотра результатов")
+}
+
+// printDebugInfo выводит отладочную информацию о параметрах запроса
+func printDebugInfo(file, system, commandInput string, timeout int) {
+	printColored("\n🔍 DEBUG ИНФОРМАЦИЯ:\n", colorCyan)
+	fmt.Printf("📁 Файл: %s\n", file)
+	fmt.Printf("🤖 Системный промпт: %s\n", system)
+	fmt.Printf("💬 Запрос: %s\n", commandInput)
+	fmt.Printf("⏱️  Таймаут: %d сек\n", timeout)
+	fmt.Printf("🌐 Провайдер: %s\n", config.AppConfig.ProviderType)
+	fmt.Printf("🏠 Хост: %s\n", config.AppConfig.Host)
+	fmt.Printf("🧠 Модель: %s\n", config.AppConfig.Model)
+	fmt.Printf("📝 История: %t\n", !config.AppConfig.MainFlags.NoHistory)
+	printColored("────────────────────────────────────────\n", colorCyan)
 }

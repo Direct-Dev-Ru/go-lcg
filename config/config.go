@@ -15,6 +15,7 @@ type Config struct {
 	Prompt        string
 	ApiKeyFile    string
 	ResultFolder  string
+	PromptFolder  string
 	ProviderType  string
 	JwtToken      string
 	PromptID      string
@@ -22,6 +23,7 @@ type Config struct {
 	ResultHistory string
 	NoHistoryEnv  string
 	MainFlags     MainFlags
+	Server        ServerConfig
 }
 
 type MainFlags struct {
@@ -30,6 +32,12 @@ type MainFlags struct {
 	Sys       string
 	PromptID  int
 	Timeout   int
+	Debug     bool
+}
+
+type ServerConfig struct {
+	Port string
+	Host string
 }
 
 func getEnv(key, defaultValue string) string {
@@ -49,6 +57,9 @@ func Load() Config {
 	os.MkdirAll(path.Join(homedir, ".config", "lcg", "gpt_results"), 0755)
 	resultFolder := getEnv("LCG_RESULT_FOLDER", path.Join(homedir, ".config", "lcg", "gpt_results"))
 
+	os.MkdirAll(path.Join(homedir, ".config", "lcg", "gpt_sys_prompts"), 0755)
+	promptFolder := getEnv("LCG_PROMPT_FOLDER", path.Join(homedir, ".config", "lcg", "gpt_sys_prompts"))
+
 	return Config{
 		Cwd:           cwd,
 		Host:          getEnv("LCG_HOST", "http://192.168.87.108:11434/"),
@@ -58,12 +69,17 @@ func Load() Config {
 		Prompt:        getEnv("LCG_PROMPT", "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks. No need ` symbols."),
 		ApiKeyFile:    getEnv("LCG_API_KEY_FILE", ".openai_api_key"),
 		ResultFolder:  resultFolder,
+		PromptFolder:  promptFolder,
 		ProviderType:  getEnv("LCG_PROVIDER", "ollama"),
 		JwtToken:      getEnv("LCG_JWT_TOKEN", ""),
 		PromptID:      getEnv("LCG_PROMPT_ID", "1"),
 		Timeout:       getEnv("LCG_TIMEOUT", "300"),
 		ResultHistory: getEnv("LCG_RESULT_HISTORY", path.Join(resultFolder, "lcg_history.json")),
 		NoHistoryEnv:  getEnv("LCG_NO_HISTORY", ""),
+		Server: ServerConfig{
+			Port: getEnv("LCG_SERVER_PORT", "8080"),
+			Host: getEnv("LCG_SERVER_HOST", "localhost"),
+		},
 	}
 }
 

@@ -137,6 +137,34 @@ func SaveToHistory(historyPath, resultFolder, cmdText, response, system string, 
 	return nil
 }
 
+// SaveToHistoryFromHistory сохраняет запись из истории без запроса о перезаписи
+func SaveToHistoryFromHistory(historyPath, resultFolder, cmdText, response, system, explanation string) error {
+	items, _ := read(historyPath)
+	duplicateIndex := -1
+	for i, h := range items {
+		if strings.EqualFold(strings.TrimSpace(h.Command), strings.TrimSpace(cmdText)) {
+			duplicateIndex = i
+			break
+		}
+	}
+	entry := HistoryEntry{
+		Index:       len(items) + 1,
+		Command:     cmdText,
+		Response:    response,
+		Explanation: explanation,
+		System:      system,
+		Timestamp:   time.Now(),
+	}
+	if duplicateIndex == -1 {
+		items = append(items, entry)
+		return write(historyPath, items)
+	}
+	// Если дубликат найден, перезаписываем без запроса
+	entry.Index = items[duplicateIndex].Index
+	items[duplicateIndex] = entry
+	return write(historyPath, items)
+}
+
 func CheckAndSuggestFromHistory(historyPath, cmdText string) (bool, *HistoryEntry) {
 	items, err := read(historyPath)
 	if err != nil || len(items) == 0 {

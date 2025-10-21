@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
@@ -25,12 +26,22 @@ func writeFile(filePath, content string) {
 	}
 }
 
-func saveResponse(response string, gpt3Model string, prompt string, cmd string) {
+func saveResponse(response string, gpt3Model string, prompt string, cmd string, explanation ...string) {
 	timestamp := nowTimestamp()
 	filename := fmt.Sprintf("gpt_request_%s_%s.md", gpt3Model, timestamp)
 	filePath := pathJoin(config.AppConfig.ResultFolder, filename)
 	title := truncateTitle(cmd)
-	content := fmt.Sprintf("# %s\n\n## Prompt\n\n%s\n\n## Response\n\n%s\n", title, cmd+". "+prompt, response)
+
+	var content string
+	if len(explanation) > 0 && strings.TrimSpace(explanation[0]) != "" {
+		// Если есть объяснение, сохраняем полную структуру
+		content = fmt.Sprintf("# %s\n\n## Prompt\n\n%s\n\n## Response\n\n%s\n\n## Explanation\n\n%s\n",
+			title, cmd+". "+prompt, response, explanation[0])
+	} else {
+		// Если объяснения нет, сохраняем базовую структуру
+		content = fmt.Sprintf("# %s\n\n## Prompt\n\n%s\n\n## Response\n\n%s\n",
+			title, cmd+". "+prompt, response)
+	}
 	writeFile(filePath, content)
 }
 

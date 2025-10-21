@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/direct-dev-ru/linux-command-gpt/config"
 )
 
 // SystemPrompt представляет системный промпт
@@ -21,28 +23,50 @@ type PromptManager struct {
 	Prompts    []SystemPrompt
 	ConfigFile string
 	HomeDir    string
+	Language   string // Текущий язык для файла sys_prompts (en/ru)
 }
 
 // NewPromptManager создает новый менеджер промптов
 func NewPromptManager(homeDir string) *PromptManager {
-	configFile := filepath.Join(homeDir, ".lcg_prompts.json")
+	// Используем конфигурацию из модуля config
+	promptFolder := config.AppConfig.PromptFolder
+
+	// Путь к файлу sys_prompts
+	sysPromptsFile := filepath.Join(promptFolder, "sys_prompts")
 
 	pm := &PromptManager{
-		ConfigFile: configFile,
+		ConfigFile: sysPromptsFile,
 		HomeDir:    homeDir,
 	}
 
-	// Загружаем предустановленные промпты
-	pm.loadDefaultPrompts()
+	// Проверяем, существует ли файл sys_prompts
+	if _, err := os.Stat(sysPromptsFile); os.IsNotExist(err) {
+		// Если файла нет, создаем его с системными промптами и промптами подробности
+		pm.createInitialPromptsFile()
+	}
 
-	// Загружаем пользовательские промпты
-	pm.loadCustomPrompts()
+	// Загружаем все промпты из файла
+	pm.loadAllPrompts()
 
 	return pm
 }
 
+// createInitialPromptsFile создает начальный файл с системными промптами и промптами подробности
+func (pm *PromptManager) createInitialPromptsFile() {
+	// Загружаем все встроенные промпты из YAML (английские по умолчанию)
+	pm.Prompts = GetBuiltinPrompts()
+
+	// Фикс: при первичном сохранении явно выставляем язык файла
+	if pm.Language == "" {
+		pm.Language = "en"
+	}
+
+	// Сохраняем все промпты в файл
+	pm.saveAllPrompts()
+}
+
 // loadDefaultPrompts загружает предустановленные промпты
-func (pm *PromptManager) loadDefaultPrompts() {
+func (pm *PromptManager) LoadDefaultPrompts() {
 	defaultPrompts := []SystemPrompt{
 		{
 			ID:          1,
@@ -79,8 +103,8 @@ func (pm *PromptManager) loadDefaultPrompts() {
 	pm.Prompts = defaultPrompts
 }
 
-// loadCustomPrompts загружает пользовательские промпты из файла
-func (pm *PromptManager) loadCustomPrompts() {
+// loadAllPrompts загружает все промпты из файла sys_prompts
+func (pm *PromptManager) loadAllPrompts() {
 	if _, err := os.Stat(pm.ConfigFile); os.IsNotExist(err) {
 		return
 	}
@@ -90,16 +114,58 @@ func (pm *PromptManager) loadCustomPrompts() {
 		return
 	}
 
-	var customPrompts []SystemPrompt
-	if err := json.Unmarshal(data, &customPrompts); err != nil {
+	// Новый формат: объект с полями language и prompts
+	var pf promptsFile
+	if err := json.Unmarshal(data, &pf); err == nil && len(pf.Prompts) > 0 {
+		pm.Language = pf.Language
+		pm.Prompts = pf.Prompts
 		return
 	}
 
-	// Добавляем пользовательские промпты с новыми ID
-	for i, prompt := range customPrompts {
-		prompt.ID = len(pm.Prompts) + i + 1
-		pm.Prompts = append(pm.Prompts, prompt)
+	// Старый формат: просто массив промптов
+	var prompts []SystemPrompt
+	if err := json.Unmarshal(data, &prompts); err == nil {
+		pm.Prompts = prompts
+		pm.Language = "en"
+		// Миграция в новый формат при следующем сохранении
 	}
+}
+
+// saveAllPrompts сохраняет все промпты в файл sys_prompts
+// внутренний формат хранения файла sys_prompts
+type promptsFile struct {
+	Language string         `json:"language,omitempty"`
+	Prompts  []SystemPrompt `json:"prompts"`
+}
+
+func (pm *PromptManager) saveAllPrompts() error {
+	pf := promptsFile{
+		Language: pm.Language,
+		Prompts:  pm.Prompts,
+	}
+	data, err := json.MarshalIndent(pf, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(pm.ConfigFile, data, 0644)
+}
+
+// SaveAllPrompts экспортированная версия saveAllPrompts
+func (pm *PromptManager) SaveAllPrompts() error {
+	return pm.saveAllPrompts()
+}
+
+// GetCurrentLanguage возвращает текущий язык из файла промптов
+func (pm *PromptManager) GetCurrentLanguage() string {
+	if pm.Language == "" {
+		return "en"
+	}
+	return pm.Language
+}
+
+// SetLanguage устанавливает язык для всех промптов
+func (pm *PromptManager) SetLanguage(lang string) {
+	pm.Language = lang
 }
 
 // saveCustomPrompts сохраняет пользовательские промпты
@@ -140,22 +206,134 @@ func (pm *PromptManager) GetPromptByName(name string) (*SystemPrompt, error) {
 	return nil, fmt.Errorf("промпт с именем '%s' не найден", name)
 }
 
+// AddPrompt добавляет новый промпт
+func (pm *PromptManager) AddPrompt(name, description, content string) error {
+	// Находим максимальный ID
+	maxID := 0
+	for _, prompt := range pm.Prompts {
+		if prompt.ID > maxID {
+			maxID = prompt.ID
+		}
+	}
+
+	newPrompt := SystemPrompt{
+		ID:          maxID + 1,
+		Name:        name,
+		Description: description,
+		Content:     content,
+	}
+
+	pm.Prompts = append(pm.Prompts, newPrompt)
+	return pm.saveAllPrompts()
+}
+
+// UpdatePrompt обновляет существующий промпт
+func (pm *PromptManager) UpdatePrompt(id int, name, description, content string) error {
+	for i, prompt := range pm.Prompts {
+		if prompt.ID == id {
+			pm.Prompts[i].Name = name
+			pm.Prompts[i].Description = description
+			pm.Prompts[i].Content = content
+			return pm.saveAllPrompts()
+		}
+	}
+	return fmt.Errorf("промпт с ID %d не найден", id)
+}
+
+// DeletePrompt удаляет промпт по ID
+func (pm *PromptManager) DeletePrompt(id int) error {
+	for i, prompt := range pm.Prompts {
+		if prompt.ID == id {
+			pm.Prompts = append(pm.Prompts[:i], pm.Prompts[i+1:]...)
+			return pm.saveAllPrompts()
+		}
+	}
+	return fmt.Errorf("промпт с ID %d не найден", id)
+}
+
 // ListPrompts выводит список всех доступных промптов
 func (pm *PromptManager) ListPrompts() {
-	fmt.Println("Available system prompts:")
-	fmt.Println("ID | Name                      | Description")
-	fmt.Println("---+---------------------------+--------------------------------")
+	pm.ListPromptsWithFull(false)
+}
 
-	for _, prompt := range pm.Prompts {
-		description := prompt.Description
-		if len(description) > 80 {
-			description = description[:77] + "..."
+// ListPromptsWithFull выводит список промптов с опцией полного вывода
+func (pm *PromptManager) ListPromptsWithFull(full bool) {
+	fmt.Println("📝 Доступные системные промпты:")
+	fmt.Println()
+
+	for i, prompt := range pm.Prompts {
+		// Разделитель между промптами
+		if i > 0 {
+			fmt.Println("─" + strings.Repeat("─", 60))
 		}
-		fmt.Printf("%-2d | %-25s | %s\n",
-			prompt.ID,
-			truncateString(prompt.Name, 25),
-			description)
+
+		// Проверяем, является ли промпт встроенным и неизмененным
+		isDefault := pm.isDefaultPrompt(prompt)
+
+		// Заголовок промпта
+		if isDefault {
+			fmt.Printf("🔹 ID: %d | Название: %s | Встроенный\n", prompt.ID, prompt.Name)
+		} else {
+			fmt.Printf("🔹 ID: %d | Название: %s\n", prompt.ID, prompt.Name)
+		}
+
+		// Описание
+		if prompt.Description != "" {
+			fmt.Printf("📋 Описание: %s\n", prompt.Description)
+		}
+
+		// Содержимое промпта
+		fmt.Println("📄 Содержимое:")
+		fmt.Println("┌" + strings.Repeat("─", 58) + "┐")
+
+		// Разбиваем содержимое на строки и выводим с отступами
+		lines := strings.Split(prompt.Content, "\n")
+		for _, line := range lines {
+			if full {
+				// Полный вывод без обрезки - разбиваем длинные строки
+				if len(line) > 56 {
+					// Разбиваем длинную строку на части
+					for i := 0; i < len(line); i += 56 {
+						end := i + 56
+						if end > len(line) {
+							end = len(line)
+						}
+						fmt.Printf("│ %-56s │\n", line[i:end])
+					}
+				} else {
+					fmt.Printf("│ %-56s │\n", line)
+				}
+			} else {
+				// Обычный вывод с обрезкой
+				fmt.Printf("│ %-56s │\n", truncateString(line, 56))
+			}
+		}
+
+		fmt.Println("└" + strings.Repeat("─", 58) + "┘")
+		fmt.Println()
 	}
+}
+
+// isDefaultPrompt проверяет, является ли промпт встроенным и неизмененным
+func (pm *PromptManager) isDefaultPrompt(prompt SystemPrompt) bool {
+	// Используем новую функцию из builtin_prompts.go
+	return IsBuiltinPrompt(prompt)
+}
+
+// IsDefaultPromptByID проверяет, является ли промпт встроенным только по ID (игнорирует содержимое)
+func (pm *PromptManager) IsDefaultPromptByID(prompt SystemPrompt) bool {
+	// Проверяем, что ID находится в диапазоне встроенных промптов (1-8)
+	return prompt.ID >= 1 && prompt.ID <= 8
+}
+
+// GetRussianDefaultPrompts возвращает русские версии встроенных промптов
+func GetRussianDefaultPrompts() []SystemPrompt {
+	return GetBuiltinPromptsByLanguage("ru")
+}
+
+// getDefaultPrompts возвращает оригинальные встроенные промпты
+func (pm *PromptManager) GetDefaultPrompts() []SystemPrompt {
+	return GetBuiltinPrompts()
 }
 
 // AddCustomPrompt добавляет новый пользовательский промпт
