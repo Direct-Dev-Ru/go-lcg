@@ -21,7 +21,7 @@ sudo apt-get install xsel
 Сборка из исходников:
 
 ```bash
-git clone --depth 1 https://github.com/asrul10/linux-command-gpt.git ~/.linux-command-gpt
+git clone --depth 1 https://github.com/Direct-Dev-Ru/linux-command-gpt.git ~/.linux-command-gpt
 cd ~/.linux-command-gpt
 go build -o lcg
 

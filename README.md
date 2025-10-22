@@ -9,7 +9,7 @@ Generate Linux commands from natural language. Supports Ollama and Proxy backend
 Build from source:
 
 ```bash
-git clone --depth 1 https://github.com/Direct-Dev-Ru/go-lcg.git ~/.linux-command-gpt
+git clone --depth 1 https://github.com/Direct-Dev-Ru/linux-command-gpt.git ~/.linux-command-gpt
 cd ~/.linux-command-gpt
 go build -o lcg
 
@@ -37,10 +37,20 @@ Clipboard support requires `xclip` or `xsel`.
 
 ## Environment
 
-- `LCG_PROVIDER` (ollama|proxy), `LCG_HOST`, `LCG_MODEL`, `LCG_PROMPT`
-- `LCG_TIMEOUT` (default 120), `LCG_RESULT_FOLDER` (default ./gpt_results)
-- `LCG_RESULT_HISTORY` (default $(LCG_RESULT_FOLDER)/lcg_history.json)
-- `LCG_JWT_TOKEN` (for proxy)
+- `LCG_PROVIDER` (default `ollama`) — provider type: `ollama` or `proxy`
+- `LCG_HOST` (default `http://192.168.87.108:11434/`) — base API URL
+- `LCG_MODEL` (default `hf.co/yandex/YandexGPT-5-Lite-8B-instruct-GGUF:Q4_K_M`)
+- `LCG_PROMPT` — default system prompt content
+- `LCG_PROXY_URL` (default `/api/v1/protected/sberchat/chat`) — proxy chat endpoint
+- `LCG_COMPLETIONS_PATH` (default `api/chat`) — Ollama chat endpoint (relative)
+- `LCG_TIMEOUT` (default `300`) — request timeout in seconds
+- `LCG_RESULT_FOLDER` (default `~/.config/lcg/gpt_results`) — folder for saved results
+- `LCG_RESULT_HISTORY` (default `$(LCG_RESULT_FOLDER)/lcg_history.json`) — JSON history path
+- `LCG_PROMPT_FOLDER` (default `~/.config/lcg/gpt_sys_prompts`) — folder for system prompts
+- `LCG_PROMPT_ID` (default `1`) — default system prompt ID
+- `LCG_JWT_TOKEN` — JWT token for proxy provider
+- `LCG_NO_HISTORY` — if `1`/`true`, disables history writes for the process
+- `LCG_SERVER_PORT` (default `8080`), `LCG_SERVER_HOST` (default `localhost`) — HTTP server settings
 
 ## Flags
 
@@ -48,6 +58,8 @@ Clipboard support requires `xclip` or `xsel`.
 - `--sys, -s` system prompt content or ID
 - `--prompt-id, --pid` choose built-in prompt (1–5)
 - `--timeout, -t` request timeout (sec)
+- `--no-history, --nh` disable writing/updating JSON history for this run
+- `--debug, -d` show debug information (request parameters and prompts)
 - `--version, -v` print version; `--help, -h` help
 
 ## Commands
@@ -60,10 +72,11 @@ Clipboard support requires `xclip` or `xsel`.
 - `history list` — list history from JSON
 - `history view <index>` — view by index
 - `history delete <index>` — delete by index (re-numbering)
+- `serve-result` — start HTTP server to browse saved results (`--port`, `--host`)
 
 ## Saving results
 
-Files are saved to `LCG_RESULT_FOLDER`.
+Files are saved to `LCG_RESULT_FOLDER` (default `~/.config/lcg/gpt_results`).
 
 - Command result: `gpt_request_<MODEL>_YYYY-MM-DD_HH-MM-SS.md`
   - `# <title>` — H1 with original request (trimmed to 120 chars: first 116 + `...`)

@@ -54,6 +54,7 @@ func ShowHistory(historyPath string, printColored func(string, string), colorYel
 	for _, h := range items {
 		ts := h.Timestamp.Format("2006-01-02 15:04:05")
 		fmt.Printf("%d. [%s] %s → %s\n", h.Index, ts, h.Command, h.Response)
+		fmt.Printf("%s\n", "========================================================================================")
 	}
 }
 
