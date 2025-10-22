@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/direct-dev-ru/linux-command-gpt/config"
 	"github.com/direct-dev-ru/linux-command-gpt/gpt"
 	"github.com/direct-dev-ru/linux-command-gpt/reader"
+	"github.com/direct-dev-ru/linux-command-gpt/serve"
 	"github.com/urfave/cli/v2"
 )
 
@@ -517,9 +519,8 @@ func getCommands() []*cli.Command {
 			},
 		},
 		{
-			Name:    "serve-result",
-			Aliases: []string{"serve"},
-			Usage:   "Start HTTP server to browse saved results",
+			Name:  "serve",
+			Usage: "Start HTTP server to browse saved results",
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:    "port",
@@ -533,16 +534,42 @@ func getCommands() []*cli.Command {
 					Usage:   "Server host",
 					Value:   config.AppConfig.Server.Host,
 				},
+				&cli.BoolFlag{
+					Name:    "browser",
+					Aliases: []string{"b"},
+					Usage:   "Open browser automatically after starting server",
+					Value:   false,
+				},
 			},
 			Action: func(c *cli.Context) error {
 				port := c.String("port")
 				host := c.String("host")
+				openBrowser := c.Bool("browser")
+
+				// Пробрасываем глобальный флаг debug для web-сервера
+				// Позволяет запускать: lcg -d serve -p ...
+				if c.Bool("debug") {
+					config.AppConfig.MainFlags.Debug = true
+				}
 
 				printColored(fmt.Sprintf("🌐 Запускаю HTTP сервер на %s:%s\n", host, port), colorCyan)
 				printColored(fmt.Sprintf("📁 Папка результатов: %s\n", config.AppConfig.ResultFolder), colorYellow)
-				printColored(fmt.Sprintf("🔗 Откройте в браузере: http://%s:%s\n", host, port), colorGreen)
 
-				return cmdPackage.StartResultServer(host, port)
+				url := fmt.Sprintf("http://%s:%s", host, port)
+
+				if openBrowser {
+					printColored("🌍 Открываю браузер...\n", colorGreen)
+					if err := openBrowserURL(url); err != nil {
+						printColored(fmt.Sprintf("⚠️  Не удалось открыть браузер: %v\n", err), colorYellow)
+						printColored("📱 Откройте браузер вручную и перейдите по адресу: ", colorGreen)
+						printColored(url+"\n", colorYellow)
+					}
+				} else {
+					printColored("🔗 Откройте в браузере: ", colorGreen)
+					printColored(url+"\n", colorYellow)
+				}
+
+				return serve.StartResultServer(host, port)
 			},
 		},
 	}
@@ -668,7 +695,14 @@ func getCommand(gpt3 gpt.Gpt3, cmd string) (string, float64) {
 }
 
 func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, timeout int, explanation string) {
-	fmt.Printf("Действия: (c)копировать, (s)сохранить, (r)перегенерировать, (e)выполнить, (v|vv|vvv)подробно, (n)ничего: ")
+	// Формируем меню действий
+	menu := "Действия: (c)копировать, (s)сохранить, (r)перегенерировать"
+	if config.AppConfig.AllowExecution {
+		menu += ", (e)выполнить"
+	}
+	menu += ", (v|vv|vvv)подробно, (n)ничего: "
+
+	fmt.Print(menu)
 	var choice string
 	fmt.Scanln(&choice)
 
@@ -700,13 +734,17 @@ func handlePostResponse(response string, gpt3 gpt.Gpt3, system, cmd string, time
 		fmt.Println("🔄 Перегенерирую...")
 		executeMain("", system, cmd, timeout)
 	case "e":
-		executeCommand(response)
-		if !disableHistory {
-			if fromHistory {
-				cmdPackage.SaveToHistoryFromHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt, explanation)
-			} else {
-				cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+		if config.AppConfig.AllowExecution {
+			executeCommand(response)
+			if !disableHistory {
+				if fromHistory {
+					cmdPackage.SaveToHistoryFromHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt, explanation)
+				} else {
+					cmdPackage.SaveToHistory(config.AppConfig.ResultHistory, config.AppConfig.ResultFolder, cmd, response, gpt3.Prompt)
+				}
 			}
+		} else {
+			fmt.Println("⚠️  Выполнение команд отключено. Установите LCG_ALLOW_EXECUTION=1 для включения этой функции.")
 		}
 	case "v", "vv", "vvv":
 		level := len(choice) // 1, 2, 3
@@ -782,7 +820,9 @@ func showTips() {
 	fmt.Println("   • Команда 'history list' покажет историю запросов")
 	fmt.Println("   • Команда 'config' покажет текущие настройки")
 	fmt.Println("   • Команда 'health' проверит доступность API")
-	fmt.Println("   • Команда 'serve-result' запустит HTTP сервер для просмотра результатов")
+	fmt.Println("   • Команда 'serve' запустит HTTP сервер для просмотра результатов")
+	fmt.Println("   • Используйте --browser для автоматического открытия браузера")
+	fmt.Println("   • Установите LCG_BROWSER_PATH для указания конкретного браузера")
 }
 
 // printDebugInfo выводит отладочную информацию о параметрах запроса
@@ -797,4 +837,50 @@ func printDebugInfo(file, system, commandInput string, timeout int) {
 	fmt.Printf("🧠 Модель: %s\n", config.AppConfig.Model)
 	fmt.Printf("📝 История: %t\n", !config.AppConfig.MainFlags.NoHistory)
 	printColored("────────────────────────────────────────\n", colorCyan)
+}
+
+// openBrowserURL открывает URL в браузере
+func openBrowserURL(url string) error {
+	// Проверяем переменную окружения LCG_BROWSER_PATH
+	if browserPath := os.Getenv("LCG_BROWSER_PATH"); browserPath != "" {
+		return exec.Command(browserPath, url).Start()
+	}
+
+	// Список браузеров в порядке приоритета
+	browsers := []string{
+		"yandex-browser",        // Яндекс.Браузер
+		"yandex-browser-stable", // Яндекс.Браузер (стабильная версия)
+		"firefox",               // Mozilla Firefox
+		"firefox-esr",           // Firefox ESR
+		"google-chrome",         // Google Chrome
+		"google-chrome-stable",  // Google Chrome (стабильная версия)
+		"chromium",              // Chromium
+		"chromium-browser",      // Chromium (Ubuntu/Debian)
+	}
+
+	// Стандартные пути для поиска браузеров
+	paths := []string{
+		"/usr/bin",
+		"/usr/local/bin",
+		"/opt/google/chrome",
+		"/opt/yandex/browser",
+		"/snap/bin",
+		"/usr/lib/chromium-browser",
+	}
+
+	// Ищем браузер в указанном порядке
+	for _, browser := range browsers {
+		for _, path := range paths {
+			fullPath := filepath.Join(path, browser)
+			if _, err := os.Stat(fullPath); err == nil {
+				return exec.Command(fullPath, url).Start()
+			}
+		}
+		// Также пробуем найти в PATH
+		if _, err := exec.LookPath(browser); err == nil {
+			return exec.Command(browser, url).Start()
+		}
+	}
+
+	return fmt.Errorf("не найден ни один из поддерживаемых браузеров")
 }

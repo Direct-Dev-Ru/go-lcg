@@ -53,13 +53,11 @@ func NewPromptManager(homeDir string) *PromptManager {
 
 // createInitialPromptsFile создает начальный файл с системными промптами и промптами подробности
 func (pm *PromptManager) createInitialPromptsFile() {
-	// Загружаем все встроенные промпты из YAML (английские по умолчанию)
-	pm.Prompts = GetBuiltinPrompts()
+	// Устанавливаем язык по умолчанию как русский
+	pm.Language = "ru"
 
-	// Фикс: при первичном сохранении явно выставляем язык файла
-	if pm.Language == "" {
-		pm.Language = "en"
-	}
+	// Загружаем все встроенные промпты из YAML на русском языке
+	pm.Prompts = GetBuiltinPromptsByLanguage("ru")
 
 	// Сохраняем все промпты в файл
 	pm.saveAllPrompts()
@@ -378,4 +376,28 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// GetVerbosePromptByLevel возвращает промпт для подробного объяснения по уровню
+func GetVerbosePromptByLevel(level int) string {
+	// Создаем PromptManager для получения текущего языка из sys_prompts (без принудительной загрузки дефолтов)
+	pm := NewPromptManager("")
+	currentLang := pm.GetCurrentLanguage()
+
+	var prompt *SystemPrompt
+	switch level {
+	case 1:
+		prompt = GetBuiltinPromptByIDAndLanguage(6, currentLang) // v
+	case 2:
+		prompt = GetBuiltinPromptByIDAndLanguage(7, currentLang) // vv
+	case 3:
+		prompt = GetBuiltinPromptByIDAndLanguage(8, currentLang) // vvv
+	default:
+		return ""
+	}
+
+	if prompt != nil {
+		return prompt.Content
+	}
+	return ""
 }
