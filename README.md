@@ -35,6 +35,11 @@ Explanations:
 
 Clipboard support requires `xclip` or `xsel`.
 
+## What's new in 2.0.1
+
+- Mobile UI improvements: better responsiveness (buttons, fonts, spacing) and reduced motion support
+- Public REST endpoint: `POST /execute` (curl-only) for programmatic access — see `API_GUIDE.md`
+
 ## Environment
 
 - `LCG_PROVIDER` (default `ollama`) — provider type: `ollama` or `proxy`
