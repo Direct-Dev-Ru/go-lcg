@@ -143,6 +143,7 @@ const HistoryPageTemplate = `
             .history-header { flex-direction: column; align-items: flex-start; gap: 8px; }
             .history-item { padding: 15px; }
             .history-response { font-size: 0.85em; }
+            .search-container input { font-size: 16px; width: 96% !important; }
         }
         
         @media (max-width: 480px) {

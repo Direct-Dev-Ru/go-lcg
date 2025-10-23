@@ -11,6 +11,15 @@ var ExecutePageScriptsTemplate = template.Must(template.New("execute_scripts").P
             e.preventDefault();
             return false;
         }
+        
+        // Валидация длины полей
+        const prompt = document.getElementById('prompt').value;
+        const maxUserMessageLength = {{.MaxUserMessageLength}};
+        if (prompt.length > maxUserMessageLength) {
+            alert('Пользовательское сообщение слишком длинное: максимум ' + maxUserMessageLength + ' символов');
+            e.preventDefault();
+            return false;
+        }
         this.dataset.submitting = 'true';
         const submitBtn = document.getElementById('submitBtn');
         const loading = document.getElementById('loading');

@@ -191,12 +191,26 @@ func handleFileView(w http.ResponseWriter, r *http.Request) {
 	// Конвертируем Markdown в HTML
 	htmlContent := blackfriday.Run(content)
 
-	// Создаем HTML страницу с красивым отображением
-	htmlPage := fmt.Sprintf(templates.FileViewTemplate, filename, filename, string(htmlContent))
+	// Создаем данные для шаблона
+	data := struct {
+		Filename string
+		Content  template.HTML
+	}{
+		Filename: filename,
+		Content:  template.HTML(htmlContent),
+	}
+
+	// Парсим и выполняем шаблон
+	tmpl := templates.FileViewTemplate
+	t, err := template.New("file_view").Parse(tmpl)
+	if err != nil {
+		http.Error(w, "Ошибка шаблона", http.StatusInternalServerError)
+		return
+	}
 
 	// Устанавливаем заголовки для отображения HTML
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(htmlPage))
+	t.Execute(w, data)
 }
 
 // handleDeleteFile обрабатывает удаление файла

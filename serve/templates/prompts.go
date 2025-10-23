@@ -407,7 +407,12 @@ const PromptsPageTemplate = `
         
         function editVerbosePrompt(mode, content) {
             // Редактирование промпта подробности
-            alert('Редактирование промптов подробности будет реализовано');
+            document.getElementById('formTitle').textContent = 'Редактировать промпт подробности (' + mode + ')';
+            document.getElementById('promptId').value = mode;
+            document.getElementById('promptName').value = mode;
+            document.getElementById('promptDescription').value = 'Промпт для режима ' + mode;
+            document.getElementById('promptContent').value = content;
+            document.getElementById('promptForm').style.display = 'block';
         }
         
         function deletePrompt(id) {
@@ -432,10 +437,42 @@ const PromptsPageTemplate = `
         document.getElementById('promptFormData').addEventListener('submit', function(e) {
             e.preventDefault();
             
+            // Валидация длины полей
+            const name = document.getElementById('promptName').value;
+            const description = document.getElementById('promptDescription').value;
+            const content = document.getElementById('promptContent').value;
+            
+            const maxContentLength = {{.MaxSystemPromptLength}};
+            const maxNameLength = {{.MaxPromptNameLength}};
+            const maxDescLength = {{.MaxPromptDescLength}};
+            
+            if (content.length > maxContentLength) {
+                alert('Содержимое промпта слишком длинное: максимум ' + maxContentLength + ' символов');
+                return;
+            }
+            if (name.length > maxNameLength) {
+                alert('Название промпта слишком длинное: максимум ' + maxNameLength + ' символов');
+                return;
+            }
+            if (description.length > maxDescLength) {
+                alert('Описание промпта слишком длинное: максимум ' + maxDescLength + ' символов');
+                return;
+            }
+            
             const formData = new FormData(this);
             const id = formData.get('id');
-            const url = id ? '/prompts/edit/' + id : '/prompts/add';
-            const method = id ? 'PUT' : 'POST';
+            
+            // Определяем, это системный промпт или промпт подробности
+            const isVerbosePrompt = ['v', 'vv', 'vvv'].includes(id);
+            
+            let url, method;
+            if (isVerbosePrompt) {
+                url = '/prompts/edit-verbose/' + id;
+                method = 'PUT';
+            } else {
+                url = id ? '/prompts/edit/' + id : '/prompts/add';
+                method = id ? 'PUT' : 'POST';
+            }
             
             fetch(url, {
                 method: method,

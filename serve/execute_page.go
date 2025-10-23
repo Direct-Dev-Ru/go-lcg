@@ -10,6 +10,7 @@ import (
 	"github.com/direct-dev-ru/linux-command-gpt/config"
 	"github.com/direct-dev-ru/linux-command-gpt/gpt"
 	"github.com/direct-dev-ru/linux-command-gpt/serve/templates"
+	"github.com/direct-dev-ru/linux-command-gpt/validation"
 	"github.com/russross/blackfriday/v2"
 )
 
@@ -22,6 +23,8 @@ type ExecutePageData struct {
 	ResultSection  template.HTML
 	VerboseButtons template.HTML
 	ActionButtons  template.HTML
+	// Поля конфигурации для валидации
+	MaxUserMessageLength int
 }
 
 // SystemPromptOption представляет опцию системного промпта
@@ -74,13 +77,14 @@ func showExecuteForm(w http.ResponseWriter) {
 	}
 
 	data := ExecutePageData{
-		Title:          "Выполнение запроса",
-		Header:         "Выполнение запроса",
-		CurrentPrompt:  "",
-		SystemOptions:  systemOptions,
-		ResultSection:  template.HTML(""),
-		VerboseButtons: template.HTML(""),
-		ActionButtons:  template.HTML(""),
+		Title:                "Выполнение запроса",
+		Header:               "Выполнение запроса",
+		CurrentPrompt:        "",
+		SystemOptions:        systemOptions,
+		ResultSection:        template.HTML(""),
+		VerboseButtons:       template.HTML(""),
+		ActionButtons:        template.HTML(""),
+		MaxUserMessageLength: config.AppConfig.Validation.MaxUserMessageLength,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -102,6 +106,12 @@ func handleExecuteRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Валидация длины пользовательского сообщения
+	if err := validation.ValidateUserMessage(prompt); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	systemID := 1
 	if systemIDStr != "" {
 		if id, err := strconv.Atoi(systemIDStr); err == nil && id >= 1 && id <= 5 {
@@ -113,6 +123,12 @@ func handleExecuteRequest(w http.ResponseWriter, r *http.Request) {
 	systemPrompt, err := pm.GetPromptByID(systemID)
 	if err != nil {
 		http.Error(w, "Failed to get system prompt", http.StatusInternalServerError)
+		return
+	}
+
+	// Валидация длины системного промпта
+	if err := validation.ValidateSystemPrompt(systemPrompt.Content); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -179,13 +195,14 @@ func handleExecuteRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ExecutePageData{
-		Title:          "Результат выполнения",
-		Header:         "Результат выполнения",
-		CurrentPrompt:  prompt,
-		SystemOptions:  systemOptions,
-		ResultSection:  template.HTML(formatResultSection(result)),
-		VerboseButtons: template.HTML(formatVerboseButtons(result)),
-		ActionButtons:  template.HTML(formatActionButtons(result)),
+		Title:                "Результат выполнения",
+		Header:               "Результат выполнения",
+		CurrentPrompt:        prompt,
+		SystemOptions:        systemOptions,
+		ResultSection:        template.HTML(formatResultSection(result)),
+		VerboseButtons:       template.HTML(formatVerboseButtons(result)),
+		ActionButtons:        template.HTML(formatActionButtons(result)),
+		MaxUserMessageLength: config.AppConfig.Validation.MaxUserMessageLength,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

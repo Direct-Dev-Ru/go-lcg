@@ -171,7 +171,7 @@ const ResultsPageTemplate = `
             .stats { grid-template-columns: 1fr 1fr; }
             .nav-buttons { flex-direction: column; gap: 8px; }
             .nav-btn, .nav-button { text-align: center; padding: 12px 16px; font-size: 14px; }
-            .search-container input { font-size: 16px; }
+            .search-container input { font-size: 16px; width: 96% !important; }
         }
         @media (max-width: 480px) {
             .header h1 { font-size: 1.8em; }

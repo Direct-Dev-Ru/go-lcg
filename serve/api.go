@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
+	"github.com/direct-dev-ru/linux-command-gpt/validation"
 )
 
 // SaveResultRequest представляет запрос на сохранение результата
@@ -59,6 +60,20 @@ func handleSaveResult(w http.ResponseWriter, r *http.Request) {
 
 	if req.Prompt == "" || req.Command == "" {
 		http.Error(w, "Prompt and command are required", http.StatusBadRequest)
+		return
+	}
+
+	// Валидация длины полей
+	if err := validation.ValidateUserMessage(req.Prompt); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidateCommand(req.Command); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidateExplanation(req.Explanation); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -121,6 +136,28 @@ func handleAddToHistory(w http.ResponseWriter, r *http.Request) {
 
 	if req.Prompt == "" || req.Command == "" || req.Response == "" {
 		http.Error(w, "Prompt, command and response are required", http.StatusBadRequest)
+		return
+	}
+
+	// Валидация длины полей
+	if err := validation.ValidateUserMessage(req.Prompt); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidateCommand(req.Command); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidateCommand(req.Response); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidateExplanation(req.Explanation); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidateSystemPrompt(req.System); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

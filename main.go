@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/direct-dev-ru/linux-command-gpt/gpt"
 	"github.com/direct-dev-ru/linux-command-gpt/reader"
 	"github.com/direct-dev-ru/linux-command-gpt/serve"
+	"github.com/direct-dev-ru/linux-command-gpt/validation"
 	"github.com/urfave/cli/v2"
 )
 
@@ -308,24 +310,20 @@ func getCommands() []*cli.Command {
 			Name:    "config",
 			Aliases: []string{"co"}, // Изменено с "c" на "co"
 			Usage:   "Show current configuration",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:    "full",
+					Aliases: []string{"f"},
+					Usage:   "Show full configuration object",
+				},
+			},
 			Action: func(c *cli.Context) error {
-				fmt.Printf("Provider: %s\n", config.AppConfig.ProviderType)
-				fmt.Printf("Host: %s\n", config.AppConfig.Host)
-				fmt.Printf("Model: %s\n", config.AppConfig.Model)
-				fmt.Printf("Prompt: %s\n", config.AppConfig.Prompt)
-				fmt.Printf("Timeout: %s seconds\n", config.AppConfig.Timeout)
-				if config.AppConfig.ProviderType == "proxy" {
-					fmt.Printf("JWT Token: %s\n", func() string {
-						if config.AppConfig.JwtToken != "" {
-							return "***set***"
-						}
-						currentUser, _ := user.Current()
-						jwtFile := currentUser.HomeDir + "/.proxy_jwt_token"
-						if _, err := os.Stat(jwtFile); err == nil {
-							return "***from file***"
-						}
-						return "***not set***"
-					}())
+				if c.Bool("full") {
+					// Выводим полную конфигурацию в JSON формате
+					showFullConfig()
+				} else {
+					// Выводим краткую конфигурацию
+					showShortConfig()
 				}
 				return nil
 			},
@@ -552,10 +550,35 @@ func getCommands() []*cli.Command {
 					config.AppConfig.MainFlags.Debug = true
 				}
 
-				printColored(fmt.Sprintf("🌐 Запускаю HTTP сервер на %s:%s\n", host, port), colorCyan)
+				// Обновляем конфигурацию сервера с новыми параметрами
+				config.AppConfig.Server.Host = host
+				config.AppConfig.Server.Port = port
+				// Пересчитываем AllowHTTP на основе нового хоста
+				config.AppConfig.Server.AllowHTTP = getServerAllowHTTPForHost(host)
+
+				// Определяем протокол на основе хоста
+				useHTTPS := !config.AppConfig.Server.AllowHTTP
+				protocol := "http"
+				if useHTTPS {
+					protocol = "https"
+				}
+
+				printColored(fmt.Sprintf("🌐 Запускаю %s сервер на %s:%s\n", strings.ToUpper(protocol), host, port), colorCyan)
 				printColored(fmt.Sprintf("📁 Папка результатов: %s\n", config.AppConfig.ResultFolder), colorYellow)
 
-				url := fmt.Sprintf("http://%s:%s", host, port)
+				// Предупреждение о самоподписанном сертификате
+				if useHTTPS {
+					printColored("⚠️  Используется самоподписанный SSL сертификат\n", colorYellow)
+					printColored("   Браузер может показать предупреждение о безопасности\n", colorYellow)
+					printColored("   Нажмите 'Дополнительно' → 'Перейти на сайт' для продолжения\n", colorYellow)
+				}
+
+				// Для автооткрытия браузера заменяем 0.0.0.0 на localhost
+				browserHost := host
+				if host == "0.0.0.0" {
+					browserHost = "localhost"
+				}
+				url := fmt.Sprintf("%s://%s:%s", protocol, browserHost, port)
 
 				if openBrowser {
 					printColored("🌍 Открываю браузер...\n", colorGreen)
@@ -576,6 +599,18 @@ func getCommands() []*cli.Command {
 }
 
 func executeMain(file, system, commandInput string, timeout int) {
+	// Валидация длины пользовательского сообщения
+	if err := validation.ValidateUserMessage(commandInput); err != nil {
+		printColored(fmt.Sprintf("❌ Ошибка: %s\n", err.Error()), colorRed)
+		return
+	}
+
+	// Валидация длины системного промпта
+	if err := validation.ValidateSystemPrompt(system); err != nil {
+		printColored(fmt.Sprintf("❌ Ошибка: %s\n", err.Error()), colorRed)
+		return
+	}
+
 	// Выводим debug информацию если включен флаг
 	if config.AppConfig.MainFlags.Debug {
 		printDebugInfo(file, system, commandInput, timeout)
@@ -883,4 +918,118 @@ func openBrowserURL(url string) error {
 	}
 
 	return fmt.Errorf("не найден ни один из поддерживаемых браузеров")
+}
+
+// getServerAllowHTTPForHost определяет AllowHTTP для конкретного хоста
+func getServerAllowHTTPForHost(host string) bool {
+	// Если переменная явно установлена, используем её
+	if value, exists := os.LookupEnv("LCG_SERVER_ALLOW_HTTP"); exists {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+
+	// Если переменная не установлена, определяем по умолчанию на основе хоста
+	return isSecureHost(host)
+}
+
+// isSecureHost проверяет, является ли хост безопасным для HTTP
+func isSecureHost(host string) bool {
+	secureHosts := []string{"localhost", "127.0.0.1", "::1"}
+	for _, secureHost := range secureHosts {
+		if host == secureHost {
+			return true
+		}
+	}
+	return false
+}
+
+// showShortConfig показывает краткую конфигурацию
+func showShortConfig() {
+	fmt.Printf("Provider: %s\n", config.AppConfig.ProviderType)
+	fmt.Printf("Host: %s\n", config.AppConfig.Host)
+	fmt.Printf("Model: %s\n", config.AppConfig.Model)
+	fmt.Printf("Prompt: %s\n", config.AppConfig.Prompt)
+	fmt.Printf("Timeout: %s seconds\n", config.AppConfig.Timeout)
+	if config.AppConfig.ProviderType == "proxy" {
+		fmt.Printf("JWT Token: %s\n", func() string {
+			if config.AppConfig.JwtToken != "" {
+				return "***set***"
+			}
+			currentUser, _ := user.Current()
+			jwtFile := currentUser.HomeDir + "/.proxy_jwt_token"
+			if _, err := os.Stat(jwtFile); err == nil {
+				return "***from file***"
+			}
+			return "***not set***"
+		}())
+	}
+}
+
+// showFullConfig показывает полную конфигурацию в JSON формате
+func showFullConfig() {
+	// Создаем структуру для безопасного вывода (скрываем чувствительные данные)
+	type SafeConfig struct {
+		Cwd            string                  `json:"cwd"`
+		Host           string                  `json:"host"`
+		ProxyUrl       string                  `json:"proxy_url"`
+		Completions    string                  `json:"completions"`
+		Model          string                  `json:"model"`
+		Prompt         string                  `json:"prompt"`
+		ApiKeyFile     string                  `json:"api_key_file"`
+		ResultFolder   string                  `json:"result_folder"`
+		PromptFolder   string                  `json:"prompt_folder"`
+		ProviderType   string                  `json:"provider_type"`
+		JwtToken       string                  `json:"jwt_token"` // Показываем статус, не сам токен
+		PromptID       string                  `json:"prompt_id"`
+		Timeout        string                  `json:"timeout"`
+		ResultHistory  string                  `json:"result_history"`
+		NoHistoryEnv   string                  `json:"no_history_env"`
+		AllowExecution bool                    `json:"allow_execution"`
+		MainFlags      config.MainFlags        `json:"main_flags"`
+		Server         config.ServerConfig     `json:"server"`
+		Validation     config.ValidationConfig `json:"validation"`
+	}
+
+	// Создаем безопасную копию конфигурации
+	safeConfig := SafeConfig{
+		Cwd:          config.AppConfig.Cwd,
+		Host:         config.AppConfig.Host,
+		ProxyUrl:     config.AppConfig.ProxyUrl,
+		Completions:  config.AppConfig.Completions,
+		Model:        config.AppConfig.Model,
+		Prompt:       config.AppConfig.Prompt,
+		ApiKeyFile:   config.AppConfig.ApiKeyFile,
+		ResultFolder: config.AppConfig.ResultFolder,
+		PromptFolder: config.AppConfig.PromptFolder,
+		ProviderType: config.AppConfig.ProviderType,
+		JwtToken: func() string {
+			if config.AppConfig.JwtToken != "" {
+				return "***set***"
+			}
+			currentUser, _ := user.Current()
+			jwtFile := currentUser.HomeDir + "/.proxy_jwt_token"
+			if _, err := os.Stat(jwtFile); err == nil {
+				return "***from file***"
+			}
+			return "***not set***"
+		}(),
+		PromptID:       config.AppConfig.PromptID,
+		Timeout:        config.AppConfig.Timeout,
+		ResultHistory:  config.AppConfig.ResultHistory,
+		NoHistoryEnv:   config.AppConfig.NoHistoryEnv,
+		AllowExecution: config.AppConfig.AllowExecution,
+		MainFlags:      config.AppConfig.MainFlags,
+		Server:         config.AppConfig.Server,
+		Validation:     config.AppConfig.Validation,
+	}
+
+	// Выводим JSON с отступами
+	jsonData, err := json.MarshalIndent(safeConfig, "", "  ")
+	if err != nil {
+		fmt.Printf("Ошибка сериализации конфигурации: %v\n", err)
+		return
+	}
+
+	fmt.Println(string(jsonData))
 }

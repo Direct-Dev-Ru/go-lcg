@@ -7,13 +7,13 @@ const FileViewTemplate = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - LCG Results</title>
+    <title>{{.Filename}} - LCG Results</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #56ab2f 0%%, #a8e6cf 100%%);
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
             min-height: 100vh;
         }
         .container {
@@ -25,7 +25,7 @@ const FileViewTemplate = `
             overflow: hidden;
         }
         .header {
-            background: linear-gradient(135deg, #2d5016 0%%, #4a7c59 100%%);
+            background: linear-gradient(135deg, #2d5016 0%, #4a7c59 100%);
             color: white;
             padding: 20px 30px;
             display: flex;
@@ -125,11 +125,11 @@ const FileViewTemplate = `
 <body>
     <div class="container">
         <div class="header">
-            <h1>📄 %s</h1>
+            <h1>📄 {{.Filename}}</h1>
             <a href="/" class="back-btn">← Назад к списку</a>
         </div>
         <div class="content">
-            %s
+            {{.Content}}
         </div>
     </div>
 </body>

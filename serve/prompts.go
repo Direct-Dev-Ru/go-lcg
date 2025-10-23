@@ -9,8 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/direct-dev-ru/linux-command-gpt/config"
 	"github.com/direct-dev-ru/linux-command-gpt/gpt"
 	"github.com/direct-dev-ru/linux-command-gpt/serve/templates"
+	"github.com/direct-dev-ru/linux-command-gpt/validation"
 )
 
 // VerbosePrompt структура для промптов подробности
@@ -82,13 +84,19 @@ func handlePromptsPage(w http.ResponseWriter, r *http.Request) {
 	verbosePrompts := getVerbosePromptsFromFile(pm.Prompts, lang)
 
 	data := struct {
-		Prompts        []PromptWithDefault
-		VerbosePrompts []VerbosePrompt
-		Lang           string
+		Prompts               []PromptWithDefault
+		VerbosePrompts        []VerbosePrompt
+		Lang                  string
+		MaxSystemPromptLength int
+		MaxPromptNameLength   int
+		MaxPromptDescLength   int
 	}{
-		Prompts:        promptsWithDefault,
-		VerbosePrompts: verbosePrompts,
-		Lang:           lang,
+		Prompts:               promptsWithDefault,
+		VerbosePrompts:        verbosePrompts,
+		Lang:                  lang,
+		MaxSystemPromptLength: config.AppConfig.Validation.MaxSystemPromptLength,
+		MaxPromptNameLength:   config.AppConfig.Validation.MaxPromptNameLength,
+		MaxPromptDescLength:   config.AppConfig.Validation.MaxPromptDescLength,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -121,6 +129,20 @@ func handleAddPrompt(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&promptData); err != nil {
 		http.Error(w, "Ошибка парсинга JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Валидация длины полей
+	if err := validation.ValidateSystemPrompt(promptData.Content); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidatePromptName(promptData.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidatePromptDescription(promptData.Description); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -171,6 +193,20 @@ func handleEditPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Валидация длины полей
+	if err := validation.ValidateSystemPrompt(promptData.Content); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidatePromptName(promptData.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidatePromptDescription(promptData.Description); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Обновляем промпт
 	if err := pm.UpdatePrompt(id, promptData.Name, promptData.Description, promptData.Content); err != nil {
 		http.Error(w, fmt.Sprintf("Ошибка обновления промпта: %v", err), http.StatusInternalServerError)
@@ -179,6 +215,76 @@ func handleEditPrompt(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Промпт успешно обновлен"))
+}
+
+// handleEditVerbosePrompt обрабатывает редактирование промпта подробности
+func handleEditVerbosePrompt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем режим из URL
+	mode := strings.TrimPrefix(r.URL.Path, "/prompts/edit-verbose/")
+
+	// Получаем домашнюю директорию пользователя
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		http.Error(w, "Ошибка получения домашней директории", http.StatusInternalServerError)
+		return
+	}
+
+	// Создаем менеджер промптов
+	pm := gpt.NewPromptManager(homeDir)
+
+	// Парсим JSON данные
+	var promptData struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Content     string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&promptData); err != nil {
+		http.Error(w, "Ошибка парсинга JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Валидация длины полей
+	if err := validation.ValidateSystemPrompt(promptData.Content); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidatePromptName(promptData.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validation.ValidatePromptDescription(promptData.Description); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Определяем ID по режиму
+	var id int
+	switch mode {
+	case "v":
+		id = 6
+	case "vv":
+		id = 7
+	case "vvv":
+		id = 8
+	default:
+		http.Error(w, "Неверный режим промпта", http.StatusBadRequest)
+		return
+	}
+
+	// Обновляем промпт
+	if err := pm.UpdatePrompt(id, promptData.Name, promptData.Description, promptData.Content); err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка обновления промпта: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Промпт подробности успешно обновлен"))
 }
 
 // handleDeletePrompt обрабатывает удаление промпта

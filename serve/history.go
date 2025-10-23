@@ -151,18 +151,29 @@ func handleHistoryView(w http.ResponseWriter, r *http.Request) {
 			</div>`, string(explanationHTML))
 	}
 
-	// Создаем HTML страницу
-	htmlPage := fmt.Sprintf(templates.HistoryViewTemplate,
-		index, // title
-		index, // header
-		targetEntry.Timestamp.Format("02.01.2006 15:04:05"), // timestamp
-		index,                // meta index
-		targetEntry.Command,  // command
-		targetEntry.Response, // response
-		explanationSection,   // explanation (if exists)
-		index,                // delete button index
-	)
+	// Создаем данные для шаблона
+	data := struct {
+		Index           int
+		Timestamp       string
+		Command         string
+		Response        string
+		ExplanationHTML template.HTML
+	}{
+		Index:           index,
+		Timestamp:       targetEntry.Timestamp.Format("02.01.2006 15:04:05"),
+		Command:         targetEntry.Command,
+		Response:        targetEntry.Response,
+		ExplanationHTML: template.HTML(explanationSection),
+	}
+
+	// Парсим и выполняем шаблон
+	tmpl := templates.HistoryViewTemplate
+	t, err := template.New("history_view").Parse(tmpl)
+	if err != nil {
+		http.Error(w, "Ошибка шаблона", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(htmlPage))
+	t.Execute(w, data)
 }

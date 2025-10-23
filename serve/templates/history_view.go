@@ -7,13 +7,13 @@ const HistoryViewTemplate = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Запись #%d - LCG History</title>
+    <title>Запись #{{.Index}} - LCG History</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #56ab2f 0%%, #a8e6cf 100%%);
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
             min-height: 100vh;
         }
         .container {
@@ -25,7 +25,7 @@ const HistoryViewTemplate = `
             overflow: hidden;
         }
         .header {
-            background: linear-gradient(135deg, #2d5016 0%%, #4a7c59 100%%);
+            background: linear-gradient(135deg, #2d5016 0%, #4a7c59 100%);
             color: white;
             padding: 20px 30px;
             display: flex;
@@ -212,7 +212,7 @@ const HistoryViewTemplate = `
             .back-btn { padding: 6px 12px; font-size: 0.9em; }
             .content { padding: 20px; }
             .actions { flex-direction: column; }
-            .action-btn { width: 100%; text-align: center; }
+            .action-btn { text-align: center; }
             .history-response-content { font-size: 0.9em; }
         }
         @media (max-width: 480px) {
@@ -223,34 +223,34 @@ const HistoryViewTemplate = `
 <body>
     <div class="container">
         <div class="header">
-            <h1>📝 Запись #%d</h1>
+            <h1>📝 Запись #{{.Index}}</h1>
             <a href="/history" class="back-btn">← Назад к истории</a>
         </div>
         <div class="content">
             <div class="history-meta">
                 <div class="history-meta-item">
-                    <span class="history-meta-label">📅 Время:</span> %s
+                    <span class="history-meta-label">📅 Время:</span> {{.Timestamp}}
                 </div>
                 <div class="history-meta-item">
-                    <span class="history-meta-label">🔢 Индекс:</span> #%d
+                    <span class="history-meta-label">🔢 Индекс:</span> #{{.Index}}
                 </div>
             </div>
             
             <div class="history-command">
                 <h3>💬 Запрос пользователя:</h3>
-                <div class="history-command-text">%s</div>
+                <div class="history-command-text">{{.Command}}</div>
             </div>
             
             <div class="history-response">
                 <h3>🤖 Ответ Модели:</h3>
-                <div class="history-response-content">%s</div>
+                <div class="history-response-content">{{.Response}}</div>
             </div>
             
-            %s
+            {{.ExplanationHTML}}
             
             <div class="actions">
                 <a href="/history" class="action-btn">📝 К истории</a>
-                <button class="action-btn delete-btn" onclick="deleteHistoryEntry(%d)">🗑️ Удалить запись</button>
+                <button class="action-btn delete-btn" onclick="deleteHistoryEntry({{.Index}})">🗑️ Удалить запись</button>
             </div>
         </div>
     </div>

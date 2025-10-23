@@ -9,6 +9,7 @@ import (
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
 	"github.com/direct-dev-ru/linux-command-gpt/gpt"
+	"github.com/direct-dev-ru/linux-command-gpt/validation"
 )
 
 // ExecuteRequest представляет запрос на выполнение
@@ -58,9 +59,20 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Валидация длины пользовательского сообщения
+	if err := validation.ValidateUserMessage(req.Prompt); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Определяем системный промпт
 	systemPrompt := ""
 	if req.SystemText != "" {
+		// Валидация длины пользовательского системного промпта
+		if err := validation.ValidateSystemPrompt(req.SystemText); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		systemPrompt = req.SystemText
 	} else if req.SystemID > 0 && req.SystemID <= 5 {
 		// Получаем системный промпт по ID
@@ -70,9 +82,19 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to get system prompt", http.StatusInternalServerError)
 			return
 		}
+		// Валидация длины системного промпта из базы
+		if err := validation.ValidateSystemPrompt(prompt.Content); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		systemPrompt = prompt.Content
 	} else {
 		// Используем промпт по умолчанию
+		// Валидация длины системного промпта по умолчанию
+		if err := validation.ValidateSystemPrompt(config.AppConfig.Prompt); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		systemPrompt = config.AppConfig.Prompt
 	}
 

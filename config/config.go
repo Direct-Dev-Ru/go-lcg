@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -25,6 +26,7 @@ type Config struct {
 	AllowExecution bool
 	MainFlags      MainFlags
 	Server         ServerConfig
+	Validation     ValidationConfig
 }
 
 type MainFlags struct {
@@ -37,8 +39,21 @@ type MainFlags struct {
 }
 
 type ServerConfig struct {
-	Port string
-	Host string
+	Port         string
+	Host         string
+	ConfigFolder string
+	AllowHTTP    bool
+	SSLCertFile  string
+	SSLKeyFile   string
+}
+
+type ValidationConfig struct {
+	MaxSystemPromptLength int
+	MaxUserMessageLength  int
+	MaxPromptNameLength   int
+	MaxPromptDescLength   int
+	MaxCommandLength      int
+	MaxExplanationLength  int
 }
 
 func getEnv(key, defaultValue string) string {
@@ -46,6 +61,38 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value, exists := os.LookupEnv(key); exists {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getServerAllowHTTP() bool {
+	// Если переменная явно установлена, используем её
+	if value, exists := os.LookupEnv("LCG_SERVER_ALLOW_HTTP"); exists {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+
+	// Если переменная не установлена, определяем по умолчанию на основе хоста
+	host := getEnv("LCG_SERVER_HOST", "localhost")
+	return isSecureHost(host)
+}
+
+func isSecureHost(host string) bool {
+	secureHosts := []string{"localhost", "127.0.0.1", "::1"}
+	for _, secureHost := range secureHosts {
+		if host == secureHost {
+			return true
+		}
+	}
+	return false
 }
 
 func Load() Config {
@@ -79,8 +126,20 @@ func Load() Config {
 		NoHistoryEnv:   getEnv("LCG_NO_HISTORY", ""),
 		AllowExecution: isAllowExecutionEnabled(),
 		Server: ServerConfig{
-			Port: getEnv("LCG_SERVER_PORT", "8080"),
-			Host: getEnv("LCG_SERVER_HOST", "localhost"),
+			Port:         getEnv("LCG_SERVER_PORT", "8080"),
+			Host:         getEnv("LCG_SERVER_HOST", "localhost"),
+			ConfigFolder: getEnv("LCG_CONFIG_FOLDER", path.Join(homedir, ".config", "lcg", "config")),
+			AllowHTTP:    getServerAllowHTTP(),
+			SSLCertFile:  getEnv("LCG_SERVER_SSL_CERT_FILE", ""),
+			SSLKeyFile:   getEnv("LCG_SERVER_SSL_KEY_FILE", ""),
+		},
+		Validation: ValidationConfig{
+			MaxSystemPromptLength: getEnvInt("LCG_MAX_SYSTEM_PROMPT_LENGTH", 2000),
+			MaxUserMessageLength:  getEnvInt("LCG_MAX_USER_MESSAGE_LENGTH", 4000),
+			MaxPromptNameLength:   getEnvInt("LCG_MAX_PROMPT_NAME_LENGTH", 2000),
+			MaxPromptDescLength:   getEnvInt("LCG_MAX_PROMPT_DESC_LENGTH", 5000),
+			MaxCommandLength:      getEnvInt("LCG_MAX_COMMAND_LENGTH", 8000),
+			MaxExplanationLength:  getEnvInt("LCG_MAX_EXPLANATION_LENGTH", 20000),
 		},
 	}
 }
