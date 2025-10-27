@@ -8,18 +8,41 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
 	"github.com/direct-dev-ru/linux-command-gpt/serve/templates"
 	"github.com/russross/blackfriday/v2"
 )
 
+// generateAbbreviation создает аббревиатуру из первых букв слов в названии приложения
+func generateAbbreviation(appName string) string {
+	words := strings.Fields(appName)
+	var abbreviation strings.Builder
+
+	for _, word := range words {
+		if len(word) > 0 {
+			// Берем первую букву слова, если это буква
+			firstRune := []rune(word)[0]
+			if unicode.IsLetter(firstRune) {
+				abbreviation.WriteRune(unicode.ToUpper(firstRune))
+			}
+		}
+	}
+
+	result := abbreviation.String()
+	if result == "" {
+		return "LCG" // Fallback если не удалось сгенерировать аббревиатуру
+	}
+	return result
+}
+
 // FileInfo содержит информацию о файле
 type FileInfo struct {
 	Name    string
 	Size    string
 	ModTime string
-	Preview string
+	Preview template.HTML
 	Content string // Полное содержимое для поиска
 }
 
@@ -52,13 +75,19 @@ func handleResultsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Files       []FileInfo
-		TotalFiles  int
-		RecentFiles int
+		Files           []FileInfo
+		TotalFiles      int
+		RecentFiles     int
+		BasePath        string
+		AppName         string
+		AppAbbreviation string
 	}{
-		Files:       files,
-		TotalFiles:  len(files),
-		RecentFiles: recentCount,
+		Files:           files,
+		TotalFiles:      len(files),
+		RecentFiles:     recentCount,
+		BasePath:        getBasePath(),
+		AppName:         config.AppConfig.AppName,
+		AppAbbreviation: generateAbbreviation(config.AppConfig.AppName),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -83,44 +112,15 @@ func getResultFiles() ([]FileInfo, error) {
 			continue
 		}
 
-		// Читаем превью файла (первые 200 символов) и конвертируем Markdown
+		// Читаем превью файла (первые 200 символов) как обычный текст
 		preview := ""
 		fullContent := ""
 		if content, err := os.ReadFile(filepath.Join(config.AppConfig.ResultFolder, entry.Name())); err == nil {
 			// Сохраняем полное содержимое для поиска
 			fullContent = string(content)
-			// Конвертируем Markdown в HTML для превью
-			htmlContent := blackfriday.Run(content)
-			preview = strings.TrimSpace(string(htmlContent))
-			// Удаляем HTML теги для превью
-			preview = strings.ReplaceAll(preview, "<h1>", "")
-			preview = strings.ReplaceAll(preview, "</h1>", "")
-			preview = strings.ReplaceAll(preview, "<h2>", "")
-			preview = strings.ReplaceAll(preview, "</h2>", "")
-			preview = strings.ReplaceAll(preview, "<h3>", "")
-			preview = strings.ReplaceAll(preview, "</h3>", "")
-			preview = strings.ReplaceAll(preview, "<p>", "")
-			preview = strings.ReplaceAll(preview, "</p>", "")
-			preview = strings.ReplaceAll(preview, "<code>", "")
-			preview = strings.ReplaceAll(preview, "</code>", "")
-			preview = strings.ReplaceAll(preview, "<pre>", "")
-			preview = strings.ReplaceAll(preview, "</pre>", "")
-			preview = strings.ReplaceAll(preview, "<strong>", "")
-			preview = strings.ReplaceAll(preview, "</strong>", "")
-			preview = strings.ReplaceAll(preview, "<em>", "")
-			preview = strings.ReplaceAll(preview, "</em>", "")
-			preview = strings.ReplaceAll(preview, "<ul>", "")
-			preview = strings.ReplaceAll(preview, "</ul>", "")
-			preview = strings.ReplaceAll(preview, "<li>", "• ")
-			preview = strings.ReplaceAll(preview, "</li>", "")
-			preview = strings.ReplaceAll(preview, "<ol>", "")
-			preview = strings.ReplaceAll(preview, "</ol>", "")
-			preview = strings.ReplaceAll(preview, "<blockquote>", "")
-			preview = strings.ReplaceAll(preview, "</blockquote>", "")
-			preview = strings.ReplaceAll(preview, "<br>", "")
-			preview = strings.ReplaceAll(preview, "<br/>", "")
-			preview = strings.ReplaceAll(preview, "<br />", "")
 
+			// Берем первые 200 символов как превью
+			preview = string(content)
 			// Очищаем от лишних пробелов и переносов
 			preview = strings.ReplaceAll(preview, "\n", " ")
 			preview = strings.ReplaceAll(preview, "\r", "")
@@ -136,7 +136,7 @@ func getResultFiles() ([]FileInfo, error) {
 			Name:    entry.Name(),
 			Size:    formatFileSize(info.Size()),
 			ModTime: info.ModTime().Format("02.01.2006 15:04"),
-			Preview: preview,
+			Preview: template.HTML(preview),
 			Content: fullContent,
 		})
 	}

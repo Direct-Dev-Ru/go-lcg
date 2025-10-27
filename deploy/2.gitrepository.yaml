@@ -1,0 +1,12 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: linux-command-gpt
+  namespace: flux-system
+spec:
+  interval: 3m
+  url: https://direct-dev.ru/gitea/GiteaAdmin/go-lcg.git
+  ref:
+    branch: release
+  secretRef:
+    name: gitea-token

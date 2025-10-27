@@ -17,3 +17,4 @@ gpt_results
 shell-code/jwt.admin.token
 run.sh
 lcg_history.json
+deploy/0.create_sealed_secrets.sh

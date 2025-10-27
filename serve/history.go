@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -38,9 +39,13 @@ func handleHistoryPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Entries []HistoryEntryInfo
+		Entries  []HistoryEntryInfo
+		BasePath string
+		AppName  string
 	}{
-		Entries: historyEntries,
+		Entries:  historyEntries,
+		BasePath: getBasePath(),
+		AppName:  config.AppConfig.AppName,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -53,6 +58,11 @@ func readHistoryEntries() ([]HistoryEntryInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Сортируем записи по времени в убывающем порядке (новые сначала)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Timestamp.After(entries[j].Timestamp)
+	})
 
 	var result []HistoryEntryInfo
 	for _, entry := range entries {
@@ -74,7 +84,15 @@ func handleDeleteHistoryEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indexStr := strings.TrimPrefix(r.URL.Path, "/history/delete/")
+	// Убираем BasePath из URL перед извлечением индекса
+	basePath := config.AppConfig.Server.BasePath
+	var indexStr string
+	if basePath != "" && basePath != "/" {
+		basePath = strings.TrimSuffix(basePath, "/")
+		indexStr = strings.TrimPrefix(r.URL.Path, basePath+"/history/delete/")
+	} else {
+		indexStr = strings.TrimPrefix(r.URL.Path, "/history/delete/")
+	}
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {
 		http.Error(w, "Invalid index", http.StatusBadRequest)
@@ -110,8 +128,15 @@ func handleClearHistory(w http.ResponseWriter, r *http.Request) {
 
 // handleHistoryView обрабатывает просмотр записи истории
 func handleHistoryView(w http.ResponseWriter, r *http.Request) {
-	// Получаем индекс из URL
-	indexStr := strings.TrimPrefix(r.URL.Path, "/history/view/")
+	// Получаем индекс из URL, учитывая BasePath
+	basePath := config.AppConfig.Server.BasePath
+	var indexStr string
+	if basePath != "" && basePath != "/" {
+		basePath = strings.TrimSuffix(basePath, "/")
+		indexStr = strings.TrimPrefix(r.URL.Path, basePath+"/history/view/")
+	} else {
+		indexStr = strings.TrimPrefix(r.URL.Path, "/history/view/")
+	}
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {
 		http.NotFound(w, r)
@@ -158,12 +183,14 @@ func handleHistoryView(w http.ResponseWriter, r *http.Request) {
 		Command         string
 		Response        string
 		ExplanationHTML template.HTML
+		BasePath        string
 	}{
 		Index:           index,
 		Timestamp:       targetEntry.Timestamp.Format("02.01.2006 15:04:05"),
 		Command:         targetEntry.Command,
 		Response:        targetEntry.Response,
 		ExplanationHTML: template.HTML(explanationSection),
+		BasePath:        getBasePath(),
 	}
 
 	// Парсим и выполняем шаблон

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -11,10 +12,12 @@ type Config struct {
 	Cwd            string
 	Host           string
 	ProxyUrl       string
+	AppName        string
 	Completions    string
 	Model          string
 	Prompt         string
 	ApiKeyFile     string
+	ConfigFolder   string
 	ResultFolder   string
 	PromptFolder   string
 	ProviderType   string
@@ -39,12 +42,21 @@ type MainFlags struct {
 }
 
 type ServerConfig struct {
-	Port         string
-	Host         string
-	ConfigFolder string
-	AllowHTTP    bool
-	SSLCertFile  string
-	SSLKeyFile   string
+	Port           string
+	Host           string
+	HealthUrl      string
+	ProxyUrl       string
+	BasePath       string
+	ConfigFolder   string
+	AllowHTTP      bool
+	SSLCertFile    string
+	SSLKeyFile     string
+	RequireAuth    bool
+	Password       string
+	Domain         string
+	CookieSecure   bool
+	CookiePath     string
+	CookieTTLHours int
 }
 
 type ValidationConfig struct {
@@ -87,12 +99,7 @@ func getServerAllowHTTP() bool {
 
 func isSecureHost(host string) bool {
 	secureHosts := []string{"localhost", "127.0.0.1", "::1"}
-	for _, secureHost := range secureHosts {
-		if host == secureHost {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(secureHosts, host)
 }
 
 func Load() Config {
@@ -102,14 +109,21 @@ func Load() Config {
 	if err != nil {
 		homedir = cwd
 	}
-	os.MkdirAll(path.Join(homedir, ".config", "lcg", "gpt_results"), 0755)
-	resultFolder := getEnv("LCG_RESULT_FOLDER", path.Join(homedir, ".config", "lcg", "gpt_results"))
+	privateResultsDir := path.Join(homedir, ".config", "lcg", "gpt_results")
+	os.MkdirAll(privateResultsDir, 0700)
+	resultFolder := getEnv("LCG_RESULT_FOLDER", privateResultsDir)
 
-	os.MkdirAll(path.Join(homedir, ".config", "lcg", "gpt_sys_prompts"), 0755)
-	promptFolder := getEnv("LCG_PROMPT_FOLDER", path.Join(homedir, ".config", "lcg", "gpt_sys_prompts"))
+	privatePromptsDir := path.Join(homedir, ".config", "lcg", "gpt_sys_prompts")
+	os.MkdirAll(privatePromptsDir, 0700)
+	promptFolder := getEnv("LCG_PROMPT_FOLDER", privatePromptsDir)
+
+	privateConfigDir := path.Join(homedir, ".config", "lcg", "config")
+	os.MkdirAll(privateConfigDir, 0700)
+	configFolder := getEnv("LCG_CONFIG_FOLDER", privateConfigDir)
 
 	return Config{
 		Cwd:            cwd,
+		AppName:        getEnv("LCG_APP_NAME", "Linux Command GPT"),
 		Host:           getEnv("LCG_HOST", "http://192.168.87.108:11434/"),
 		ProxyUrl:       getEnv("LCG_PROXY_URL", "/api/v1/protected/sberchat/chat"),
 		Completions:    getEnv("LCG_COMPLETIONS_PATH", "api/chat"),
@@ -118,6 +132,7 @@ func Load() Config {
 		ApiKeyFile:     getEnv("LCG_API_KEY_FILE", ".openai_api_key"),
 		ResultFolder:   resultFolder,
 		PromptFolder:   promptFolder,
+		ConfigFolder:   configFolder,
 		ProviderType:   getEnv("LCG_PROVIDER", "ollama"),
 		JwtToken:       getEnv("LCG_JWT_TOKEN", ""),
 		PromptID:       getEnv("LCG_PROMPT_ID", "1"),
@@ -126,12 +141,21 @@ func Load() Config {
 		NoHistoryEnv:   getEnv("LCG_NO_HISTORY", ""),
 		AllowExecution: isAllowExecutionEnabled(),
 		Server: ServerConfig{
-			Port:         getEnv("LCG_SERVER_PORT", "8080"),
-			Host:         getEnv("LCG_SERVER_HOST", "localhost"),
-			ConfigFolder: getEnv("LCG_CONFIG_FOLDER", path.Join(homedir, ".config", "lcg", "config")),
-			AllowHTTP:    getServerAllowHTTP(),
-			SSLCertFile:  getEnv("LCG_SERVER_SSL_CERT_FILE", ""),
-			SSLKeyFile:   getEnv("LCG_SERVER_SSL_KEY_FILE", ""),
+			Port:           getEnv("LCG_SERVER_PORT", "8080"),
+			Host:           getEnv("LCG_SERVER_HOST", "localhost"),
+			ConfigFolder:   getEnv("LCG_CONFIG_FOLDER", path.Join(homedir, ".config", "lcg", "config")),
+			AllowHTTP:      getServerAllowHTTP(),
+			SSLCertFile:    getEnv("LCG_SERVER_SSL_CERT_FILE", ""),
+			SSLKeyFile:     getEnv("LCG_SERVER_SSL_KEY_FILE", ""),
+			RequireAuth:    isServerRequireAuth(),
+			Password:       getEnv("LCG_SERVER_PASSWORD", "admin#123456"),
+			Domain:         getEnv("LCG_DOMAIN", getEnv("LCG_SERVER_HOST", "localhost")),
+			CookieSecure:   isCookieSecure(),
+			CookiePath:     getEnv("LCG_COOKIE_PATH", "/lcg"),
+			CookieTTLHours: getEnvInt("LCG_COOKIE_TTL_HOURS", 168), // 7 дней по умолчанию
+			BasePath:       getEnv("LCG_BASE_URL", "/lcg"),
+			HealthUrl:      getEnv("LCG_HEALTH_URL", "/api/v1/protected/sberchat/health"),
+			ProxyUrl:       getEnv("LCG_PROXY_URL", "/api/v1/protected/sberchat/chat"),
 		},
 		Validation: ValidationConfig{
 			MaxSystemPromptLength: getEnvInt("LCG_MAX_SYSTEM_PROMPT_LENGTH", 2000),
@@ -155,6 +179,24 @@ func (c Config) IsNoHistoryEnabled() bool {
 
 func isAllowExecutionEnabled() bool {
 	v := strings.TrimSpace(getEnv("LCG_ALLOW_EXECUTION", ""))
+	if v == "" {
+		return false
+	}
+	vLower := strings.ToLower(v)
+	return vLower == "1" || vLower == "true"
+}
+
+func isServerRequireAuth() bool {
+	v := strings.TrimSpace(getEnv("LCG_SERVER_REQUIRE_AUTH", ""))
+	if v == "" {
+		return false
+	}
+	vLower := strings.ToLower(v)
+	return vLower == "1" || vLower == "true"
+}
+
+func isCookieSecure() bool {
+	v := strings.TrimSpace(getEnv("LCG_COOKIE_SECURE", ""))
 	if v == "" {
 		return false
 	}

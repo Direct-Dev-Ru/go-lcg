@@ -1,0 +1,64 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: lcg-route
+  namespace: lcg
+  labels:
+    app: lcg
+    version: ${VERSION}
+spec:
+  entryPoints:
+  - websecure  
+  routes:
+  - kind: Rule
+    match: Host(`direct-dev.ru`) && PathPrefix(`/lcg`)
+    services:
+    - name: lcg
+      port: 8080
+  tls:
+    secretName: le-root-direct-dev-ru      
+---
+
+# apiVersion: traefik.io/v1alpha1
+# kind: IngressRoute
+# metadata:
+#   name: lcg-route
+#   namespace: lcg
+# spec:
+#   entryPoints:
+#   - websecure
+#   routes:
+#   - kind: Rule
+#     match: Host(`direct-dev.ru`) && PathPrefix(`/lcg`)
+#     services:
+#     - name: lcg
+#       port: 8080
+#     middlewares:
+#     - name: lcg-strip-prefix
+#   tls:
+#     secretName: le-root-direct-dev-ru
+# ---
+# apiVersion: traefik.io/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: lcg-strip-prefix
+#   namespace: lcg
+# spec:
+#   stripPrefix:
+#     prefixes:
+#     - /lcg
+# ---
+# apiVersion: traefik.io/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: lcg-headers
+#   namespace: lcg
+# spec:
+#   headers:
+#     customRequestHeaders:
+#       X-Forwarded-Proto: "https"
+#       X-Forwarded-Port: "443"
+#     customResponseHeaders:
+#       X-Frame-Options: "DENY"
+#       X-Content-Type-Options: "nosniff"
+#       X-XSS-Protection: "1; mode=block"

@@ -21,8 +21,19 @@ type HistoryEntry struct {
 // read читает записи истории из файла
 func Read(historyPath string) ([]HistoryEntry, error) {
 	data, err := os.ReadFile(historyPath)
-	if err != nil || len(data) == 0 {
+	if err != nil {
+		// Если файл не существует, создаем пустой файл истории
+		if os.IsNotExist(err) {
+			emptyHistory := []HistoryEntry{}
+			if writeErr := Write(historyPath, emptyHistory); writeErr != nil {
+				return nil, fmt.Errorf("не удалось создать файл истории: %v", writeErr)
+			}
+			return emptyHistory, nil
+		}
 		return nil, err
+	}
+	if len(data) == 0 {
+		return []HistoryEntry{}, nil
 	}
 	var items []HistoryEntry
 	if err := json.Unmarshal(data, &items); err != nil {

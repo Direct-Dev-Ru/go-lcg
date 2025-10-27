@@ -21,12 +21,20 @@ import (
 	"github.com/direct-dev-ru/linux-command-gpt/serve"
 	"github.com/direct-dev-ru/linux-command-gpt/validation"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed VERSION.txt
 var Version string
 
-// используем глобальный экземпляр конфига из пакета config
+//go:embed build-conditions.yaml
+var BuildConditionsFromYaml string
+
+type buildConditions struct {
+	NoServe bool `yaml:"no-serve"`
+}
+
+var CompileConditions buildConditions
 
 // disableHistory управляет записью/обновлением истории на уровне процесса (флаг имеет приоритет над env)
 var disableHistory bool
@@ -46,6 +54,14 @@ const (
 )
 
 func main() {
+
+	if err := yaml.Unmarshal([]byte(BuildConditionsFromYaml), &CompileConditions); err != nil {
+		fmt.Println("Error parsing build conditions:", err)
+		CompileConditions.NoServe = false
+	}
+
+	fmt.Println("Build conditions:", CompileConditions)
+
 	_ = colorBlue
 
 	gpt.InitBuiltinPrompts("")
@@ -57,7 +73,7 @@ func main() {
 
 	app := &cli.App{
 		Name:     "lcg",
-		Usage:    "Linux Command GPT - Генерация Linux команд из описаний",
+		Usage:    config.AppConfig.AppName + " - Генерация Linux команд из описаний",
 		Version:  Version,
 		Commands: getCommands(),
 		UsageText: `
@@ -68,7 +84,7 @@ lcg [опции] <описание команды>
   lcg --file /path/to/file.txt "хочу вывести все директории с помощью ls"
 `,
 		Description: `
-Linux Command GPT - инструмент для генерации Linux команд из описаний на естественном языке.
+{{.AppName}} - инструмент для генерации Linux команд из описаний на естественном языке.
 Поддерживает чтение частей промпта из файлов и позволяет сохранять, копировать или перегенерировать результаты.
 может задавать системный промпт или выбирать из предустановленных промптов.
 Переменные окружения:
@@ -159,6 +175,12 @@ Linux Command GPT - инструмент для генерации Linux ком�
 				}
 			}
 
+			if CompileConditions.NoServe {				
+				if len(args) > 1 && args[0] == "serve" {
+					printColored("❌ Error: serve command is disabled in this build\n", colorRed)
+					os.Exit(1)
+				}
+			}
 			executeMain(file, system, strings.Join(args, " "), timeout)
 			return nil
 		},
@@ -180,7 +202,7 @@ Linux Command GPT - инструмент для генерации Linux ком�
 }
 
 func getCommands() []*cli.Command {
-	return []*cli.Command{
+	commands := []*cli.Command{
 		{
 			Name:    "update-key",
 			Aliases: []string{"u"},
@@ -578,7 +600,15 @@ func getCommands() []*cli.Command {
 				if host == "0.0.0.0" {
 					browserHost = "localhost"
 				}
-				url := fmt.Sprintf("%s://%s:%s", protocol, browserHost, port)
+
+				// Учитываем BasePath в URL
+				basePath := config.AppConfig.Server.BasePath
+				if basePath == "" || basePath == "/" {
+					basePath = ""
+				} else {
+					basePath = strings.TrimSuffix(basePath, "/")
+				}
+				url := fmt.Sprintf("%s://%s:%s%s", protocol, browserHost, port, basePath)
 
 				if openBrowser {
 					printColored("🌍 Открываю браузер...\n", colorGreen)
@@ -596,6 +626,19 @@ func getCommands() []*cli.Command {
 			},
 		},
 	}
+
+	if CompileConditions.NoServe {
+		filteredCommands := []*cli.Command{}
+		for _, cmd := range commands {
+			if cmd.Name != "serve" {
+				filteredCommands = append(filteredCommands, cmd)
+			}
+		}
+		commands = filteredCommands
+	}
+
+	return commands
+
 }
 
 func executeMain(file, system, commandInput string, timeout int) {
@@ -972,7 +1015,6 @@ func showFullConfig() {
 	type SafeConfig struct {
 		Cwd            string                  `json:"cwd"`
 		Host           string                  `json:"host"`
-		ProxyUrl       string                  `json:"proxy_url"`
 		Completions    string                  `json:"completions"`
 		Model          string                  `json:"model"`
 		Prompt         string                  `json:"prompt"`
@@ -995,7 +1037,6 @@ func showFullConfig() {
 	safeConfig := SafeConfig{
 		Cwd:          config.AppConfig.Cwd,
 		Host:         config.AppConfig.Host,
-		ProxyUrl:     config.AppConfig.ProxyUrl,
 		Completions:  config.AppConfig.Completions,
 		Model:        config.AppConfig.Model,
 		Prompt:       config.AppConfig.Prompt,
@@ -1023,6 +1064,8 @@ func showFullConfig() {
 		Server:         config.AppConfig.Server,
 		Validation:     config.AppConfig.Validation,
 	}
+
+	safeConfig.Server.Password = "***"
 
 	// Выводим JSON с отступами
 	jsonData, err := json.MarshalIndent(safeConfig, "", "  ")

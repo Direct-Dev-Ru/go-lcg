@@ -7,7 +7,7 @@ const ResultsPageTemplate = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LCG Results - Linux Command GPT</title>
+    <title>{{.AppAbbreviation}} Результаты - {{.AppName}}</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -182,15 +182,15 @@ const ResultsPageTemplate = `
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 LCG Results</h1>
-            <p>Просмотр сохраненных результатов Linux Command GPT</p>
+            <h1>🚀 {{.AppAbbreviation}} - {{.AppName}}</h1>
+            <p>Просмотр сохраненных результатов {{.AppName}}</p>
         </div>
         <div class="content">
             <div class="nav-buttons">
                 <button class="nav-btn" onclick="location.reload()">🔄 Обновить</button>
-                <a href="/run" class="nav-btn">🚀 Выполнение</a>
-                <a href="/history" class="nav-btn">📝 История</a>
-                <a href="/prompts" class="nav-btn">⚙️ Промпты</a>
+                <a href="{{.BasePath}}/run" class="nav-btn">🚀 Выполнение</a>
+                <a href="{{.BasePath}}/history" class="nav-btn">📝 История</a>
+                <a href="{{.BasePath}}/prompts" class="nav-btn">⚙️ Промпты</a>
             </div>
             
             <!-- Поиск -->
@@ -218,7 +218,7 @@ const ResultsPageTemplate = `
                     <div class="file-actions">
                         <button class="delete-btn" onclick="deleteFile('{{.Name}}')" title="Удалить файл">🗑️</button>
                     </div>
-                    <div class="file-card-content" onclick="window.location.href='/file/{{.Name}}'">
+                    <div class="file-card-content" onclick="window.location.href='{{$.BasePath}}/file/{{.Name}}'">
                         <div class="file-name">{{.Name}}</div>
                         <div class="file-info">
                             📅 {{.ModTime}} | 📏 {{.Size}}
@@ -240,7 +240,7 @@ const ResultsPageTemplate = `
     <script>
         function deleteFile(filename) {
             if (confirm('Вы уверены, что хотите удалить файл "' + filename + '"?\\n\\nЭто действие нельзя отменить.')) {
-                fetch('/delete/' + encodeURIComponent(filename), {
+                fetch('{{.BasePath}}/delete/' + encodeURIComponent(filename), {
                     method: 'DELETE'
                 })
                 .then(response => {

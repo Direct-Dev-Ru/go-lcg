@@ -1,10 +1,14 @@
 module github.com/direct-dev-ru/linux-command-gpt
 
-go 1.18
+go 1.21
+
+toolchain go1.23.4
 
 require github.com/atotto/clipboard v0.1.4
 
 require gopkg.in/yaml.v3 v3.0.1
+
+require github.com/golang-jwt/jwt/v5 v5.3.0
 
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 //indirect

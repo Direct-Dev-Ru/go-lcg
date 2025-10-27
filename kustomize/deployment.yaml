@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lcg
+  namespace: lcg
+  labels:
+    app: lcg
+    version: v2.0.2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lcg
+  template:
+    metadata:
+      labels:
+        app: lcg
+        version: v2.0.2
+    spec:
+      containers:
+      - name: lcg
+        image: kuznetcovay/lcg:v2.0.2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: lcg-config
+        - secretRef:
+            name: lcg-secret
+        env:
+        # Pod information
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+        volumeMounts:
+        - name: lcg-data
+          mountPath: /app/data
+        - name: lcg-config
+          mountPath: /app/config
+          readOnly: true
+        # Health checks
+        startupProbe:
+          httpGet:
+            path: /login
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 30
+        readinessProbe:
+          httpGet:
+            path: /login
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /login
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 60
+      volumes:
+      - name: lcg-data
+        persistentVolumeClaim:
+          claimName: lcg-data
+      - name: lcg-config
+        configMap:
+          name: lcg-config
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        readOnlyRootFilesystem: false
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+      restartPolicy: Always
