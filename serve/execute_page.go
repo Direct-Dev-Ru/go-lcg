@@ -23,6 +23,12 @@ type ExecutePageData struct {
 	ResultSection  template.HTML
 	VerboseButtons template.HTML
 	ActionButtons  template.HTML
+	CSRFToken      string
+	ProviderType   string
+	Model          string
+	Host           string
+	BasePath       string
+	AppName        string
 	// Поля конфигурации для валидации
 	MaxUserMessageLength int
 }
@@ -50,7 +56,7 @@ func handleExecutePage(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		// Показываем форму
-		showExecuteForm(w)
+		showExecuteForm(w, r)
 	case http.MethodPost:
 		// Обрабатываем выполнение
 		handleExecuteRequest(w, r)
@@ -60,7 +66,25 @@ func handleExecutePage(w http.ResponseWriter, r *http.Request) {
 }
 
 // showExecuteForm показывает форму выполнения
-func showExecuteForm(w http.ResponseWriter) {
+func showExecuteForm(w http.ResponseWriter, r *http.Request) {
+	// Генерируем CSRF токен
+	csrfManager := GetCSRFManager()
+	if csrfManager == nil {
+		http.Error(w, "CSRF manager not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// Получаем сессионный ID
+	sessionID := getSessionID(r)
+	csrfToken, err := csrfManager.GenerateToken(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to generate CSRF token", http.StatusInternalServerError)
+		return
+	}
+
+	// Устанавливаем CSRF токен в cookie
+	setCSRFCookie(w, csrfToken)
+
 	// Получаем системные промпты
 	pm := gpt.NewPromptManager(config.AppConfig.PromptFolder)
 
@@ -84,6 +108,12 @@ func showExecuteForm(w http.ResponseWriter) {
 		ResultSection:        template.HTML(""),
 		VerboseButtons:       template.HTML(""),
 		ActionButtons:        template.HTML(""),
+		CSRFToken:            csrfToken,
+		ProviderType:         config.AppConfig.ProviderType,
+		Model:                config.AppConfig.Model,
+		Host:                 config.AppConfig.Host,
+		BasePath:             getBasePath(),
+		AppName:              config.AppConfig.AppName,
 		MaxUserMessageLength: config.AppConfig.Validation.MaxUserMessageLength,
 	}
 
@@ -194,6 +224,15 @@ func handleExecuteRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Генерируем CSRF токен для результата
+	csrfManager := GetCSRFManager()
+	sessionID := getSessionID(r)
+	csrfToken, err := csrfManager.GenerateToken(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to generate CSRF token", http.StatusInternalServerError)
+		return
+	}
+
 	data := ExecutePageData{
 		Title:                "Результат выполнения",
 		Header:               "Результат выполнения",
@@ -202,6 +241,12 @@ func handleExecuteRequest(w http.ResponseWriter, r *http.Request) {
 		ResultSection:        template.HTML(formatResultSection(result)),
 		VerboseButtons:       template.HTML(formatVerboseButtons(result)),
 		ActionButtons:        template.HTML(formatActionButtons(result)),
+		CSRFToken:            csrfToken,
+		ProviderType:         config.AppConfig.ProviderType,
+		Model:                config.AppConfig.Model,
+		Host:                 config.AppConfig.Host,
+		BasePath:             getBasePath(),
+		AppName:              config.AppConfig.AppName,
 		MaxUserMessageLength: config.AppConfig.Validation.MaxUserMessageLength,
 	}
 

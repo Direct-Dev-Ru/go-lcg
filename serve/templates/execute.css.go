@@ -79,6 +79,14 @@ var ExecutePageCSSTemplate = template.Must(template.New("execute_css").Parse(`
             opacity: 0.9;
             font-size: 1.1em;
         }
+        
+        .config-info {
+            margin: 5px 0 0 0 !important;
+            opacity: 0.7 !important;
+            font-size: 0.9em !important;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.8);
+        }
         .content {
             padding: 30px;
         }

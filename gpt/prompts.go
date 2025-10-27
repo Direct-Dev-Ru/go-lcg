@@ -57,6 +57,7 @@ func (pm *PromptManager) createInitialPromptsFile() {
 	pm.Language = "ru"
 
 	// Загружаем все встроенные промпты из YAML на русском языке
+	// Функция GetBuiltinPromptsByLanguage уже учитывает операционную систему
 	pm.Prompts = GetBuiltinPromptsByLanguage("ru")
 
 	// Сохраняем все промпты в файл
@@ -65,40 +66,8 @@ func (pm *PromptManager) createInitialPromptsFile() {
 
 // loadDefaultPrompts загружает предустановленные промпты
 func (pm *PromptManager) LoadDefaultPrompts() {
-	defaultPrompts := []SystemPrompt{
-		{
-			ID:          1,
-			Name:        "linux-command",
-			Description: "Generate Linux commands (default)",
-			Content:     "Reply with linux command and nothing else. Output with plain response - no need formatting. No need explanation. No need code blocks. No need ` symbols.",
-		},
-		{
-			ID:          2,
-			Name:        "linux-command-with-explanation",
-			Description: "Generate Linux commands with explanation",
-			Content:     "Generate a Linux command and provide a brief explanation of what it does. Format: COMMAND: explanation",
-		},
-		{
-			ID:          3,
-			Name:        "linux-command-safe",
-			Description: "Generate safe Linux commands",
-			Content:     "Generate a safe Linux command that won't cause data loss or system damage. Reply with linux command and nothing else. Output with plain response - no need formatting.",
-		},
-		{
-			ID:          4,
-			Name:        "linux-command-verbose",
-			Description: "Generate Linux commands with detailed explanation",
-			Content:     "Generate a Linux command and provide detailed explanation including what each flag does and potential alternatives.",
-		},
-		{
-			ID:          5,
-			Name:        "linux-command-simple",
-			Description: "Generate simple Linux commands",
-			Content:     "Generate a simple, easy-to-understand Linux command. Avoid complex flags and options when possible.",
-		},
-	}
-
-	pm.Prompts = defaultPrompts
+	// Используем встроенные промпты, которые автоматически выбираются по ОС
+	pm.Prompts = GetBuiltinPromptsByLanguage("en")
 }
 
 // loadAllPrompts загружает все промпты из файла sys_prompts

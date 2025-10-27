@@ -2,12 +2,16 @@ package gpt
 
 import (
 	_ "embed"
+	"runtime"
 
 	"gopkg.in/yaml.v3"
 )
 
 //go:embed builtin_prompts.yaml
 var builtinPromptsYAML string
+
+//go:embed builtin_prompts_windows.yaml
+var builtinPromptsWindowsYAML string
 
 var builtinPrompts string
 
@@ -117,7 +121,12 @@ func GetBuiltinPromptByIDAndLanguage(id int, lang string) *SystemPrompt {
 func InitBuiltinPrompts(embeddedBuiltinPromptsYAML string) {
 	// Используем встроенный YAML, если переданный параметр пустой
 	if embeddedBuiltinPromptsYAML == "" {
-		builtinPrompts = builtinPromptsYAML
+		// Выбираем промпты в зависимости от операционной системы
+		if runtime.GOOS == "windows" {
+			builtinPrompts = builtinPromptsWindowsYAML
+		} else {
+			builtinPrompts = builtinPromptsYAML
+		}
 	} else {
 		builtinPrompts = embeddedBuiltinPromptsYAML
 	}

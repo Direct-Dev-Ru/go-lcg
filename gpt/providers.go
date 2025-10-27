@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/direct-dev-ru/linux-command-gpt/config"
 )
 
 // Provider интерфейс для работы с разными LLM провайдерами
@@ -112,7 +114,7 @@ func (p *ProxyAPIProvider) Chat(messages []Chat) (string, error) {
 		return "", fmt.Errorf("ошибка маршалинга запроса: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", p.BaseURL+"/api/v1/protected/sberchat/chat", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", p.BaseURL+config.AppConfig.Server.ProxyUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("ошибка создания запроса: %w", err)
 	}
@@ -155,7 +157,7 @@ func (p *ProxyAPIProvider) Chat(messages []Chat) (string, error) {
 
 // Health для ProxyAPIProvider
 func (p *ProxyAPIProvider) Health() error {
-	req, err := http.NewRequest("GET", p.BaseURL+"/api/v1/protected/sberchat/health", nil)
+	req, err := http.NewRequest("GET", p.BaseURL+config.AppConfig.Server.HealthUrl, nil)
 	if err != nil {
 		return fmt.Errorf("ошибка создания health check запроса: %w", err)
 	}

@@ -90,6 +90,8 @@ func handlePromptsPage(w http.ResponseWriter, r *http.Request) {
 		MaxSystemPromptLength int
 		MaxPromptNameLength   int
 		MaxPromptDescLength   int
+		BasePath              string
+		AppName               string
 	}{
 		Prompts:               promptsWithDefault,
 		VerbosePrompts:        verbosePrompts,
@@ -97,6 +99,8 @@ func handlePromptsPage(w http.ResponseWriter, r *http.Request) {
 		MaxSystemPromptLength: config.AppConfig.Validation.MaxSystemPromptLength,
 		MaxPromptNameLength:   config.AppConfig.Validation.MaxPromptNameLength,
 		MaxPromptDescLength:   config.AppConfig.Validation.MaxPromptDescLength,
+		BasePath:              getBasePath(),
+		AppName:               config.AppConfig.AppName,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

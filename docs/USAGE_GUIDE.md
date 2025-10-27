@@ -2,7 +2,7 @@
 
 ## Что это
 
-Linux Command GPT (`lcg`) преобразует описание на естественном языке в готовую Linux‑команду. Инструмент поддерживает сменные провайдеры LLM (Ollama или Proxy), управление системными промптами, историю запросов, сохранение результатов, HTTP сервер для просмотра результатов и интерактивные действия над сгенерированной командой.
+Linux Command GPT (`lcg`) преобразует описание на естественном языке в готовую команду для Linux или Windows. Инструмент автоматически определяет операционную систему и использует соответствующие промпты. Поддерживает сменные провайдеры LLM (Ollama или Proxy), управление системными промптами, историю запросов, сохранение результатов, HTTP сервер для просмотра результатов, аутентификацию, CSRF защиту, интерактивные действия над сгенерированной командой и деплой в Kubernetes.
 
 ## Требования
 
@@ -60,11 +60,18 @@ lcg --file /path/to/context.txt "хочу вывести список дирек
 Действия: (c)копировать, (s)сохранить, (r)перегенерировать, (e)выполнить, (v|vv|vvv)подробно, (n)ничего:
 ```
 
-### Что нового в 2.0.1
+### Что нового в 3.0.0
 
-- Улучшена мобильная версия веб‑интерфейса: корректные размеры кнопок, шрифтов и отступов; адаптивная верстка
-- Учитывается `prefers-reduced-motion` для снижения анимаций, если это задано в системе
-- Добавлен REST эндпоинт `POST /execute` (только через curl) — см. подробности и примеры в `API_GUIDE.md`
+- **Аутентификация**: Добавлена система аутентификации с JWT токенами и HTTP-only cookies
+- **CSRF защита**: Полная защита от CSRF атак с токенами и middleware
+- **Безопасность**: Улучшенная безопасность с проверкой токенов и сессий
+- **Kubernetes деплой**: Полный набор манифестов для деплоя в Kubernetes с Traefik
+- **Flux CD**: GitOps конфигурация для автоматического деплоя
+- **Reverse Proxy**: Поддержка работы за reverse proxy с настройкой cookies
+- **Веб-интерфейс**: Улучшенный веб-интерфейс с современным дизайном
+- **Мониторинг**: Prometheus метрики и ServiceMonitor
+- **Масштабирование**: HPA для автоматического масштабирования
+- **Тестирование**: Инструменты для тестирования CSRF защиты
 
 ## Переменные окружения
 
@@ -90,6 +97,13 @@ lcg --file /path/to/context.txt "хочу вывести список дирек
 | `LCG_ALLOW_EXECUTION` | пусто | Если `1`/`true` — включает возможность выполнения команд через опцию `(e)` в меню действий. |
 | `LCG_SERVER_PORT` | `8080` | Порт для HTTP сервера просмотра результатов. |
 | `LCG_SERVER_HOST` | `localhost` | Хост для HTTP сервера просмотра результатов. |
+| `LCG_SERVER_REQUIRE_AUTH` | `false` | Требовать аутентификацию для доступа к веб-интерфейсу. |
+| `LCG_SERVER_PASSWORD` | `admin#123456` | Пароль для аутентификации. |
+| `LCG_COOKIE_SECURE` | `false` | Использовать Secure флаг для cookies (для HTTPS). |
+| `LCG_DOMAIN` | пусто | Домен для cookies (для reverse proxy). |
+| `LCG_COOKIE_PATH` | `/` | Путь для cookies (для reverse proxy). |
+| `LCG_COOKIE_TTL_HOURS` | `168` | Время жизни cookies в часах (по умолчанию 7 дней). |
+| `LCG_CSRF_SECRET` | пусто | Секрет для CSRF токенов (генерируется автоматически). |
 
 Примеры настройки:
 
@@ -104,6 +118,14 @@ export LCG_PROVIDER=proxy
 export LCG_HOST=http://localhost:8080
 export LCG_MODEL=GigaChat-2
 export LCG_JWT_TOKEN=your_jwt_token_here
+
+# Аутентификация и безопасность
+export LCG_SERVER_REQUIRE_AUTH=true
+export LCG_SERVER_PASSWORD=my_secure_password
+export LCG_COOKIE_SECURE=false
+export LCG_DOMAIN=.example.com
+export LCG_COOKIE_PATH=/lcg
+export LCG_COOKIE_TTL_HOURS=72  # 3 дня
 ```
 
 ## Базовый синтаксис
@@ -146,6 +168,8 @@ lcg [глобальные опции] <описание команды>
   - `--port, -p` — порт сервера (по умолчанию из `LCG_SERVER_PORT`)
   - `--host, -H` — хост сервера (по умолчанию из `LCG_SERVER_HOST`)
   - `--browser, -b` — открыть браузер автоматически после старта
+  - `--require-auth` — включить аутентификацию (переопределяет `LCG_SERVER_REQUIRE_AUTH`)
+  - `--password` — пароль для аутентификации (переопределяет `LCG_SERVER_PASSWORD`)
 
 ### Подробные объяснения (v/vv/vvv)
 
@@ -196,6 +220,39 @@ lcg [глобальные опции] <описание команды>
 - Не вставляйте секреты в запросы. Перед выполнением (`e`) проверяйте команду вручную.
 - Для структуры API см. `API_CONTRACT.md` (эндпоинты и форматы запросов/ответов).
 
+## Поддержка операционных систем
+
+### Автоматическое определение ОС
+
+Приложение автоматически определяет операционную систему и использует соответствующие промпты:
+
+- **Linux/Unix системы** (включая macOS): используются промпты для Linux команд
+- **Windows**: используются промпты для Windows команд (PowerShell, CMD, Batch)
+
+### Промпты для Windows
+
+На Windows системах доступны следующие встроенные промпты:
+
+| ID | Name | Описание |
+| --- | --- | --- |
+| 1 | windows-command | Основной промпт для генерации Windows команд |
+| 2 | windows-command-with-explanation | Промпт с подробным объяснением команд |
+| 3 | windows-command-safe | Безопасный анализ команд с предупреждениями |
+| 4 | windows-command-verbose | Подробный анализ с техническими деталями |
+| 5 | windows-command-simple | Простое и понятное объяснение |
+
+### Примеры использования на Windows
+
+```cmd
+# PowerShell команды
+lcg "хочу получить список всех процессов"
+lcg "показать информацию о дисках"
+
+# CMD команды  
+lcg "создать папку test и перейти в неё"
+lcg "найти все файлы .txt в текущей директории"
+```
+
 ## Системные промпты
 
 ### Управление промптами
@@ -210,6 +267,9 @@ lcg [глобальные опции] <описание команды>
 
 ### Встроенные промпты (ID 1–5)
 
+Промпты автоматически выбираются в зависимости от операционной системы:
+
+**Linux/Unix системы:**
 | ID | Name | Описание |
 | --- | --- | --- |
 | 1 | linux-command | «Ответь только Linux‑командой, без форматирования и объяснений». |
@@ -217,6 +277,15 @@ lcg [глобальные опции] <описание команды>
 | 3 | linux-command-safe | Безопасные команды (без потери данных). Вывод — только команда. |
 | 4 | linux-command-verbose | Команда с подробными объяснениями флагов и альтернатив. |
 | 5 | linux-command-simple | Простые команды, избегать сложных опций. |
+
+**Windows системы:**
+| ID | Name | Описание |
+| --- | --- | --- |
+| 1 | windows-command | «Ответь только Windows‑командой, без форматирования и объяснений». |
+| 2 | windows-command-with-explanation | Сгенерируй команду и кратко объясни, что она делает (формат: COMMAND: explanation). |
+| 3 | windows-command-safe | Безопасные команды (без потери данных). Вывод — только команда. |
+| 4 | windows-command-verbose | Команда с подробными объяснениями флагов и альтернатив. |
+| 5 | windows-command-simple | Простые команды, избегать сложных опций. |
 
 ### Промпты подробности (ID 6–8)
 
@@ -275,6 +344,12 @@ lcg serve
 - **Современный дизайн** — адаптивный интерфейс с карточками файлов
 - **Сортировка** — файлы отсортированы по дате изменения (новые сверху)
 - **Превью содержимого** — первые 200 символов каждого файла
+- **Аутентификация** — защищенный доступ с JWT токенами
+- **CSRF защита** — защита от межсайтовых атак
+- **История запросов** (`/history`) — просмотр истории всех запросов
+- **Управление промптами** (`/prompts`) — редактирование системных промптов
+- **Выполнение команд** (`/run`) — интерактивное выполнение команд
+- **Безопасность** — HTTP-only cookies, проверка токенов
 
 Структура файла (команда):
 
@@ -358,6 +433,14 @@ lcg serve --port 9090
 
 # Запуск на всех интерфейсах
 lcg serve --host 0.0.0.0 --port 8080
+
+# Запуск с аутентификацией
+lcg serve --require-auth --password my_secure_password
+
+# Запуск с переменными окружения
+export LCG_SERVER_REQUIRE_AUTH=true
+export LCG_SERVER_PASSWORD=admin#123456
+lcg serve
 ```
 
 ## История
@@ -377,6 +460,10 @@ lcg history list
 - Для `ollama`/`proxy` API‑ключ не нужен; команды `update-key`/`delete-key` просто уведомят об этом.
 - HTTP сервер не запускается: проверьте, что порт свободен, используйте `--port` для смены порта.
 - Веб-интерфейс не отображает файлы: убедитесь, что в `LCG_RESULT_FOLDER` есть `.md` файлы.
+- **Аутентификация не работает**: проверьте `LCG_SERVER_REQUIRE_AUTH=true` и правильность пароля.
+- **CSRF ошибки**: убедитесь, что токены передаются в заголовках `X-CSRF-Token`.
+- **Cookies не сохраняются**: проверьте настройки `LCG_DOMAIN` и `LCG_COOKIE_PATH` для reverse proxy.
+- **Kubernetes деплой не работает**: проверьте права доступа к кластеру и наличие всех манифестов.
 
 ## JSON‑история запросов
 
@@ -408,17 +495,148 @@ lcg history list
 
 ## Доступ к локальному API
 
-Эндпоинт: `POST /execute` (только через curl).
+### Основные эндпоинты
+
+- `POST /api/execute` — выполнение запросов к LLM
+- `POST /api/save-result` — сохранение результатов
+- `POST /api/add-to-history` — добавление в историю
+- `GET /api/login` — страница аутентификации
+- `POST /api/login` — аутентификация
+- `POST /api/logout` — выход из системы
+- `GET /metrics` — Prometheus метрики
+
+### Примеры использования
 
 ```bash
 # Запустить сервер
 lcg serve
 
-# Выполнить запрос
-curl -X POST http://localhost:8080/execute \
+# Выполнить запрос (без аутентификации)
+curl -X POST http://localhost:8080/api/execute \
   -H "Content-Type: application/json" \
   -A curl \
   -d '{"prompt": "create directory test", "verbose": "vv"}'
+
+# Аутентификация
+curl -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin#123456"}'
+
+# Выполнение с CSRF токеном
+curl -X POST http://localhost:8080/api/execute \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: your_csrf_token" \
+  -H "Cookie: auth_token=your_jwt_token" \
+  -d '{"prompt": "create directory test"}'
 ```
 
 Подробности и примеры: `API_GUIDE.md`.
+
+## Kubernetes деплой
+
+### Быстрый деплой
+
+```bash
+# Переход в папку деплоя
+cd deploy
+
+# Полный деплой (сборка + деплой + проверка)
+./full-deploy.sh
+
+# Или поэтапно
+./build.sh lcg latest
+./deploy.sh
+./health-check.sh
+```
+
+### Использование Make
+
+```bash
+# Справка
+make help
+
+# Сборка и деплой
+make build
+make deploy
+
+# Мониторинг
+make status
+make logs
+make monitor
+
+# Удаление
+make undeploy
+```
+
+### Flux CD (GitOps)
+
+```bash
+# Настройка Flux CD
+cd deploy/flux
+./setup-flux.sh
+
+# Создание Kustomization
+./create_kustomization.sh
+
+# Мониторинг
+kubectl get kustomization lcg -n flux-system
+```
+
+### Конфигурация для reverse proxy
+
+```bash
+# Настройка для работы за reverse proxy
+export LCG_SERVER_REQUIRE_AUTH=true
+export LCG_SERVER_ALLOW_HTTP=true
+export LCG_DOMAIN=.example.com
+export LCG_COOKIE_PATH=/lcg
+export LCG_COOKIE_SECURE=false
+
+# Запуск
+./lcg serve -H 0.0.0.0 -p 8080
+```
+
+### Мониторинг и безопасность
+
+- **Prometheus метрики**: `/metrics` endpoint
+- **Health checks**: автоматические проверки готовности
+- **HPA**: автоматическое масштабирование (2-10 replicas)
+- **CSRF защита**: токены для всех POST запросов
+- **Аутентификация**: JWT токены в HTTP-only cookies
+- **Security context**: non-root пользователь, минимальные права
+
+Подробности: `deploy/README.md` и `deploy/flux/README.md`.
+
+## Тестирование CSRF защиты
+
+### Автоматическое тестирование
+
+```bash
+# Запуск тестов CSRF защиты
+./test_csrf.sh
+
+# Проверка результатов
+echo "Проверьте вывод на наличие ошибок 403 Forbidden"
+```
+
+### Ручное тестирование
+
+```bash
+# Откройте csrf_test.html в браузере
+open csrf_test.html
+
+# Или используйте curl для тестирования
+curl -X POST http://localhost:8080/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "test"}' \
+  -v
+```
+
+### Демонстрация уязвимости
+
+```bash
+# Откройте csrf_demo.html для демонстрации атаки
+open csrf_demo.html
+```
+
+Подробности: `CSRF_TESTING_GUIDE.md`.

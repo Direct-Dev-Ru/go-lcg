@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -20,8 +21,19 @@ type HistoryEntry struct {
 
 func read(historyPath string) ([]HistoryEntry, error) {
 	data, err := os.ReadFile(historyPath)
-	if err != nil || len(data) == 0 {
+	if err != nil {
+		// Если файл не существует, создаем пустой файл истории
+		if os.IsNotExist(err) {
+			emptyHistory := []HistoryEntry{}
+			if writeErr := write(historyPath, emptyHistory); writeErr != nil {
+				return nil, fmt.Errorf("не удалось создать файл истории: %v", writeErr)
+			}
+			return emptyHistory, nil
+		}
 		return nil, err
+	}
+	if len(data) == 0 {
+		return []HistoryEntry{}, nil
 	}
 	var items []HistoryEntry
 	if err := json.Unmarshal(data, &items); err != nil {
@@ -50,6 +62,12 @@ func ShowHistory(historyPath string, printColored func(string, string), colorYel
 		printColored("📝 История пуста\n", colorYellow)
 		return
 	}
+	
+	// Сортируем записи по времени в убывающем порядке (новые сначала)
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Timestamp.After(items[j].Timestamp)
+	})
+	
 	printColored("📝 История (из файла):\n", colorYellow)
 	for _, h := range items {
 		ts := h.Timestamp.Format("2006-01-02 15:04:05")

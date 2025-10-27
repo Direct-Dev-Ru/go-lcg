@@ -8,7 +8,7 @@ var ExecutePageTemplate = template.Must(template.New("execute").Parse(`<!DOCTYPE
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}} - Linux Command GPT</title>
+    <title>{{.Title}} - {{.AppName}}</title>
     <style>
         {{template "execute_css" .}}        
     </style>
@@ -17,16 +17,19 @@ var ExecutePageTemplate = template.Must(template.New("execute").Parse(`<!DOCTYPE
     <div class="container">
         <div class="header">
             <h1>{{.Header}}</h1>
-            <p>Выполнение запросов к Linux Command GPT через веб-интерфейс</p>
+            <p>Выполнение запросов к {{.AppName}} через веб-интерфейс</p>
+            <p class="config-info">({{.ProviderType}} • {{.Model}} • {{.Host}})</p>
         </div>
         <div class="content">
             <div class="nav-buttons">
-                <a href="/" class="nav-btn">🏠 Главная</a>
-                <a href="/history" class="nav-btn">📝 История</a>
-                <a href="/prompts" class="nav-btn">⚙️ Промпты</a>
+                <a href="{{.BasePath}}/" class="nav-btn">🏠 Главная</a>
+                <a href="{{.BasePath}}/history" class="nav-btn">📝 История</a>
+                <a href="{{.BasePath}}/prompts" class="nav-btn">⚙️ Промпты</a>
             </div>
             
             <form method="POST" id="executeForm">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                
                 <div class="form-section">
                     <div class="form-group">
                         <label for="system_id">🤖 Системный промпт:</label>

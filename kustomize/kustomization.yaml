@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace
+namespace: lcg
+
+# Resources
+resources:
+  - configmap.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress-route.yaml  
+
+# Common labels
+commonLabels:
+  app: lcg
+  version: v2.0.2
+  managed-by: kustomize
+
+# Images
+images:
+  - name: lcg
+    newName: kuznetcovay/lcg
+    newTag: v2.0.2

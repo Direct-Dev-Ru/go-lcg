@@ -89,6 +89,7 @@ var ExecutePageScriptsTemplate = template.Must(template.New("execute_scripts").P
     function saveResult() {
         const resultDataField = document.getElementById('resultData');
         const prompt = document.getElementById('prompt').value;
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         
         if (!resultDataField.value || !prompt.trim()) {
             alert('Нет данных для сохранения');
@@ -104,10 +105,11 @@ var ExecutePageScriptsTemplate = template.Must(template.New("execute_scripts").P
                 model: resultData.model || 'Unknown'
             };
             
-            fetch('/api/save-result', {
+            fetch('{{.BasePath}}/api/save-result', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken,
                 },
                 body: JSON.stringify(requestData)
             })
@@ -134,6 +136,7 @@ var ExecutePageScriptsTemplate = template.Must(template.New("execute_scripts").P
         const resultDataField = document.getElementById('resultData');
         const prompt = document.getElementById('prompt').value;
         const systemId = document.getElementById('system_id').value;
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         
         if (!resultDataField.value || !prompt.trim()) {
             alert('Нет данных для сохранения в историю');
@@ -152,10 +155,11 @@ var ExecutePageScriptsTemplate = template.Must(template.New("execute_scripts").P
                 system: systemName
             };
             
-            fetch('/api/add-to-history', {
+            fetch('{{.BasePath}}/api/add-to-history', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken,
                 },
                 body: JSON.stringify(requestData)
             })

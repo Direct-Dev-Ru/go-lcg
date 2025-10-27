@@ -155,13 +155,13 @@ const HistoryPageTemplate = `
     <div class="container">
         <div class="header">
             <h1>📝 История запросов</h1>
-            <p>Управление историей запросов Linux Command GPT</p>
+            <p>Управление историей запросов {{.AppName}}</p>
         </div>
         <div class="content">
             <div class="nav-buttons">
-                <a href="/" class="nav-btn">🏠 Главная</a>
-                <a href="/run" class="nav-btn">🚀 Выполнение</a>
-                <a href="/prompts" class="nav-btn">⚙️ Промпты</a>
+                <a href="{{.BasePath}}/" class="nav-btn">🏠 Главная</a>
+                <a href="{{.BasePath}}/run" class="nav-btn">🚀 Выполнение</a>
+                <a href="{{.BasePath}}/prompts" class="nav-btn">⚙️ Промпты</a>
                 <button class="nav-btn clear-btn" onclick="clearHistory()">🗑️ Очистить всю историю</button>
             </div>
             
@@ -197,12 +197,12 @@ const HistoryPageTemplate = `
     
     <script>
         function viewHistoryEntry(index) {
-            window.location.href = '/history/view/' + index;
+            window.location.href = '{{.BasePath}}/history/view/' + index;
         }
         
         function deleteHistoryEntry(index) {
             if (confirm('Вы уверены, что хотите удалить запись #' + index + '?')) {
-                fetch('/history/delete/' + index, {
+                fetch('{{.BasePath}}/history/delete/' + index, {
                     method: 'DELETE'
                 })
                 .then(response => {
@@ -221,7 +221,7 @@ const HistoryPageTemplate = `
         
         function clearHistory() {
             if (confirm('Вы уверены, что хотите очистить всю историю?\\n\\nЭто действие нельзя отменить.')) {
-                fetch('/history/clear', {
+                fetch('{{.BasePath}}/history/clear', {
                     method: 'DELETE'
                 })
                 .then(response => {

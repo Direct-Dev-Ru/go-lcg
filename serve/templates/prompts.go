@@ -235,13 +235,13 @@ const PromptsPageTemplate = `
     <div class="container">
         <div class="header">
             <h1>⚙️ Системные промпты</h1>
-            <p>Управление системными промптами Linux Command GPT</p>
+            <p>Управление системными промптами {{.AppName}}</p>
         </div>
         <div class="content">
             <div class="nav-buttons">
-                <a href="/" class="nav-btn">🏠 Главная</a>
-                <a href="/run" class="nav-btn">🚀 Выполнение</a>
-                <a href="/history" class="nav-btn">📝 История</a>
+                <a href="{{.BasePath}}/" class="nav-btn">🏠 Главная</a>
+                <a href="{{.BasePath}}/run" class="nav-btn">🚀 Выполнение</a>
+                <a href="{{.BasePath}}/history" class="nav-btn">📝 История</a>
                 <button class="nav-btn add-btn" onclick="showAddForm()">➕ Добавить промпт</button>
                 <div class="lang-switcher">
                     <button class="lang-btn {{if eq .Lang "ru"}}active{{end}}" onclick="switchLang('ru')">🇷🇺 RU</button>
@@ -391,7 +391,7 @@ const PromptsPageTemplate = `
         
         function saveCurrentPrompts(lang) {
             // Отправляем запрос для сохранения текущих промптов с новым языком
-            fetch('/prompts/save-lang', {
+            fetch('{{.BasePath}}/prompts/save-lang', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -417,7 +417,7 @@ const PromptsPageTemplate = `
         
         function deletePrompt(id) {
             if (confirm('Вы уверены, что хотите удалить промпт #' + id + '?')) {
-                fetch('/prompts/delete/' + id, {
+                fetch('{{.BasePath}}/prompts/delete/' + id, {
                     method: 'DELETE'
                 })
                 .then(response => {
@@ -467,10 +467,10 @@ const PromptsPageTemplate = `
             
             let url, method;
             if (isVerbosePrompt) {
-                url = '/prompts/edit-verbose/' + id;
+                url = '{{.BasePath}}/prompts/edit-verbose/' + id;
                 method = 'PUT';
             } else {
-                url = id ? '/prompts/edit/' + id : '/prompts/add';
+                url = id ? '{{.BasePath}}/prompts/edit/' + id : '{{.BasePath}}/prompts/add';
                 method = id ? 'PUT' : 'POST';
             }
             
@@ -501,7 +501,7 @@ const PromptsPageTemplate = `
         // Функция восстановления системного промпта
         function restorePrompt(id) {
             if (confirm('Восстановить промпт к значению по умолчанию?')) {
-                fetch('/prompts/restore/' + id, {
+                fetch('{{.BasePath}}/prompts/restore/' + id, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -526,7 +526,7 @@ const PromptsPageTemplate = `
         // Функция восстановления verbose промпта
         function restoreVerbosePrompt(mode) {
             if (confirm('Восстановить промпт к значению по умолчанию?')) {
-                fetch('/prompts/restore-verbose/' + mode, {
+                fetch('{{.BasePath}}/prompts/restore-verbose/' + mode, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

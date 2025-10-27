@@ -224,7 +224,7 @@ const HistoryViewTemplate = `
     <div class="container">
         <div class="header">
             <h1>📝 Запись #{{.Index}}</h1>
-            <a href="/history" class="back-btn">← Назад к истории</a>
+            <a href="{{.BasePath}}/history" class="back-btn">← Назад к истории</a>
         </div>
         <div class="content">
             <div class="history-meta">
@@ -249,7 +249,7 @@ const HistoryViewTemplate = `
             {{.ExplanationHTML}}
             
             <div class="actions">
-                <a href="/history" class="action-btn">📝 К истории</a>
+                <a href="{{.BasePath}}/history" class="action-btn">📝 К истории</a>
                 <button class="action-btn delete-btn" onclick="deleteHistoryEntry({{.Index}})">🗑️ Удалить запись</button>
             </div>
         </div>
@@ -258,12 +258,12 @@ const HistoryViewTemplate = `
     <script>
         function deleteHistoryEntry(index) {
             if (confirm('Вы уверены, что хотите удалить запись #' + index + '?')) {
-                fetch('/history/delete/' + index, {
+                fetch('{{.BasePath}}/history/delete/' + index, {
                     method: 'DELETE'
                 })
                 .then(response => {
                     if (response.ok) {
-                        window.location.href = '/history';
+                        window.location.href = '{{.BasePath}}/history';
                     } else {
                         alert('Ошибка при удалении записи');
                     }
