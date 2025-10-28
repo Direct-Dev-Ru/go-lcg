@@ -4,8 +4,7 @@ metadata:
   name: lcg
   namespace: lcg
   labels:
-    app: lcg
-    version: v2.0.6
+    app: lcg    
 spec:
   type: ClusterIP
   ports:
@@ -14,5 +13,4 @@ spec:
     protocol: TCP
     name: http
   selector:
-    app: lcg
-    version: v2.0.6
+    app: lcg    

@@ -14,8 +14,7 @@ spec:
   template:
     metadata:
       labels:
-        app: lcg
-        version: ${VERSION}
+        app: lcg        
     spec:
       containers:
       - name: lcg
