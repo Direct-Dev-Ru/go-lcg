@@ -18,3 +18,5 @@ shell-code/jwt.admin.token
 run.sh
 lcg_history.json
 deploy/0.create_sealed_secrets.sh
+deploy/0.create_git_secrets.sh
+deploy/0.create_app_secrets.sh

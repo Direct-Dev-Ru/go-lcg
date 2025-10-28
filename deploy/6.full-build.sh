@@ -50,9 +50,7 @@ log "🚀 Полная сборка LCG (бинарные файлы + Docker о
 
 # Этап 1: Сборка бинарных файлов
 log "📦 Этап 1: Сборка бинарных файлов с goreleaser..."
-./deploy/4.build-binaries.sh "$VERSION"
-
-if [ $? -ne 0 ]; then
+if ! ./deploy/4.build-binaries.sh "$VERSION"; then
     error "Ошибка при сборке бинарных файлов"
     exit 1
 fi
@@ -61,9 +59,7 @@ success "✅ Бинарные файлы собраны успешно"
 
 # Этап 2: Сборка Docker образа
 log "🐳 Этап 2: Сборка Docker образа..."
-./deploy/5.build-docker.sh "$REPOSITORY" "$VERSION" "$PLATFORMS"
-
-if [ $? -ne 0 ]; then
+if ! ./deploy/5.build-docker.sh "$REPOSITORY" "$VERSION" "$PLATFORMS"; then
     error "Ошибка при сборке Docker образа"
     exit 1
 fi
@@ -78,7 +74,7 @@ export VERSION=$VERSION
 export PLATFORMS=$PLATFORMS
 export KUBECONFIG="${HOME}/.kube/config_hlab" && kubectx default
 
-if ! envsubst < deploy/1.configmap.yaml > kustomize/configmap.yaml; then
+if ! envsubst < deploy/1.configmap.tmpl.yaml > kustomize/configmap.yaml; then
     error "Ошибка при генерации deploy/1.configmap.yaml"
     exit 1
 fi
@@ -131,10 +127,14 @@ fi
 if [ "$current_branch" != "main" ]; then
     git checkout main
     git merge --no-ff -m "Merged branch '$current_branch' into main while building $VERSION" "$current_branch"
+elif [ "$current_branch" = "main" ]; then
+    log "🔄 Вы находитесь на ветке main. Слияние с release..."
+    git add .
+    git commit -m "Исправления в ветке $current_branch"
 fi
 
 # переключиться на ветку release и слить с веткой main
-git checkout -b release
+git checkout release
 git merge --no-ff -m "Merged main into release while building $VERSION" main
 
 # если тег $VERSION существует, удалить его и принудительно запушить
