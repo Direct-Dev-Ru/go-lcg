@@ -124,6 +124,11 @@ func (p *ProxyAPIProvider) Chat(messages []Chat) (string, error) {
 		req.Header.Set("Authorization", "Bearer "+p.JWTToken)
 	}
 
+	if config.AppConfig.MainFlags.Debug {
+		fmt.Println("Chat URL: ", p.BaseURL+config.AppConfig.Server.ProxyUrl)
+		fmt.Println("ProxyChatRequest: ", req)
+	}
+
 	resp, err := p.HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("ошибка выполнения запроса: %w", err)
