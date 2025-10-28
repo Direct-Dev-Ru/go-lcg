@@ -9,6 +9,8 @@ builds:
     goarch:
       - amd64
       - arm64
+      - windows
+      - darwin
     env:
       - CGO_ENABLED=0
     ldflags:
