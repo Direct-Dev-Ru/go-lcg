@@ -174,6 +174,14 @@ const ResultsPageTemplate = `
             .header h1 { font-size: 1.9em; }
             .content { padding: 20px; }
             .files-grid { grid-template-columns: 1fr; }
+            /* Стили карточек как в истории */
+            .file-card { background: #f0f8f0; border: 1px solid #a8e6cf; padding: 15px; }
+            .file-card:hover { border-color: #2d5016; box-shadow: 0 8px 25px rgba(45,80,22,0.2); transform: translateY(-2px); }
+            .file-name { color: #333; margin-bottom: 8px; }
+            .file-info { color: #666; font-size: 0.9em; }
+            .file-preview { background: #f8f9fa; border-left: 3px solid #2d5016; font-size: 0.85em; }
+            .file-actions { top: 8px; left: 8px; }
+            .delete-btn { padding: 2px 6px; font-size: 16px; }
             .stats { grid-template-columns: 1fr 1fr; }
             .nav-buttons { flex-direction: column; gap: 8px; }
             .nav-btn, .nav-button { text-align: center; padding: 12px 16px; font-size: 14px; }

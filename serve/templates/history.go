@@ -118,17 +118,19 @@ const HistoryPageTemplate = `
             -webkit-box-orient: vertical;
         }
         .delete-btn {
-            background: #e74c3c;
-            color: white;
+            background: transparent;
+            color: #ef9a9a; /* бледно-красный */
             border: none;
-            padding: 6px 12px;
+            padding: 2px 6px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8em;
-            transition: background 0.3s ease;
+            font-size: 18px;
+            line-height: 1;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
         .delete-btn:hover {
-            background: #c0392b;
+            color: rgb(171, 27, 24); /* ярче при ховере */
+            transform: translateY(-1px);
         }
         .empty-state {
             text-align: center;
@@ -185,7 +187,7 @@ const HistoryPageTemplate = `
                         <span class="history-index">#{{.Index}}</span>
                         <span class="history-timestamp">{{.Timestamp}}</span>
                     </div>
-                    <button class="delete-btn" onclick="event.stopPropagation(); deleteHistoryEntry({{.Index}})">🗑️ Удалить</button>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteHistoryEntry({{.Index}})">✖</button>
                 </div>
                 <div class="history-command">{{.Command}}</div>
                 <div class="history-response">{{.Response}}</div>
