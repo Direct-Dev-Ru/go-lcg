@@ -111,6 +111,11 @@ const HistoryPageTemplate = `
             font-size: 0.9em;
             color: #2d5016;
             border-left: 3px solid #2d5016;
+            max-height: 72px; /* ~4 строки */
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
         }
         .delete-btn {
             background: #e74c3c;

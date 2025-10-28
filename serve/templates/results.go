@@ -93,11 +93,12 @@ const ResultsPageTemplate = `
         }
         .file-card-content {
             cursor: pointer;
+            padding-left: 28px;
         }
         .file-actions {
             position: absolute;
             top: 10px;
-            right: 10px;
+            left: 10px;
             display: flex;
             gap: 8px;
         }
