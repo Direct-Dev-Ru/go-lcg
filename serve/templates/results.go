@@ -73,8 +73,10 @@ const ResultsPageTemplate = `
         }
         .files-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
+            align-items: stretch;
+            grid-auto-rows: auto;
         }
         .file-card {
             background: white;
@@ -100,23 +102,26 @@ const ResultsPageTemplate = `
             gap: 8px;
         }
         .delete-btn {
-            background: #e74c3c;
-            color: white;
+            background: transparent;
+            color: #ef9a9a; /* бледно-красный */
             border: none;
-            padding: 6px 12px;
+            padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8em;
-            transition: background 0.3s ease;
+            font-size: 18px;
+            line-height: 1;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
         .delete-btn:hover {
-            background: #c0392b;
+            color:rgb(171, 27, 24); /* чуть ярче при ховере */
+            transform: translateY(-1px);
         }
         .file-name {
             font-weight: 600;
             color: #333;
             margin-bottom: 8px;
             font-size: 1.1em;
+            padding-right: 10px;
         }
         .file-info {
             color: #666;
@@ -165,7 +170,7 @@ const ResultsPageTemplate = `
             body { padding: 10px; }
             .container { margin: 0; border-radius: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
             .header { padding: 20px; }
-            .header h1 { font-size: 2em; }
+            .header h1 { font-size: 1.9em; }
             .content { padding: 20px; }
             .files-grid { grid-template-columns: 1fr; }
             .stats { grid-template-columns: 1fr 1fr; }
@@ -174,7 +179,8 @@ const ResultsPageTemplate = `
             .search-container input { font-size: 16px; width: 96% !important; }
         }
         @media (max-width: 480px) {
-            .header h1 { font-size: 1.8em; }
+            .header h1 { font-size: 1.6em; }
+            .content { padding: 16px; }
             .stats { grid-template-columns: 1fr; }
         }
     </style>
@@ -216,10 +222,10 @@ const ResultsPageTemplate = `
                 {{range .Files}}
                 <div class="file-card" data-content="{{.Content}}">
                     <div class="file-actions">
-                        <button class="delete-btn" onclick="deleteFile('{{.Name}}')" title="Удалить файл">🗑️</button>
+                        <button class="delete-btn" onclick="deleteFile('{{.Name}}')" title="Удалить файл">✖</button>
                     </div>
                     <div class="file-card-content" onclick="window.location.href='{{$.BasePath}}/file/{{.Name}}'">
-                        <div class="file-name">{{.Name}}</div>
+                        <div class="file-name">{{.DisplayName}}</div>
                         <div class="file-info">
                             📅 {{.ModTime}} | 📏 {{.Size}}
                         </div>
