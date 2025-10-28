@@ -156,6 +156,9 @@ lcg [опции] <описание команды>
 				Debug:     c.Bool("debug"),
 			}
 			disableHistory = config.AppConfig.MainFlags.NoHistory || config.AppConfig.IsNoHistoryEnabled()
+			
+			config.AppConfig.MainFlags.Debug = config.AppConfig.MainFlags.Debug || config.GetEnvBool("LCG_DEBUG", false)
+			
 			args := c.Args().Slice()
 
 			if len(args) == 0 {
