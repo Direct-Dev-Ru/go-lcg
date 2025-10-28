@@ -1,0 +1,77 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: go-lcg
+  namespace: flux-system
+spec:
+  interval: 3m
+  url: https://github.com/Direct-Dev-Ru/go-lcg.git
+  ref:
+    branch: release
+  secretRef:
+    name: git-secrets
+
+---
+
+# apiVersion: source.toolkit.fluxcd.io/v1
+# kind: GitRepository
+# metadata:
+#   name: linux-command-gpt
+#   namespace: flux-system
+# spec:
+#   interval: 3m
+#   url: https://direct-dev.ru/gitea/GiteaAdmin/go-lcg.git
+#   ref:
+#     branch: release
+#   secretRef:
+#     name: gitea-token
+
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: lcg
+  namespace: flux-system
+spec:
+  healthChecks:
+  - kind: Deployment
+    name: lcg
+    namespace: lcg
+  interval: 3m15s
+  path: ./kustomize
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: go-lcg
+  targetNamespace: lcg
+  timeout: 2m0s
+
+---
+
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata:
+  name: lcg
+  namespace: flux-system
+spec:
+  image: kuznetcovay/lcg
+  interval: 3m
+  secretRef:
+    name: regcred 
+
+---
+
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: lcg
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: lcg
+  policy:
+    semver:
+      range: '>=1.0.0' 
+
+---
