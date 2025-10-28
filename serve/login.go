@@ -14,7 +14,7 @@ import (
 func handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Если пользователь уже авторизован, перенаправляем на главную
 	if isAuthenticated(r) {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, makePath("/"), http.StatusSeeOther)
 		return
 	}
 
@@ -41,6 +41,7 @@ func handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		Message:   "",
 		Error:     "",
 		CSRFToken: csrfToken,
+		BasePath:  getBasePath(),
 	}
 
 	if err := RenderLoginPage(w, data); err != nil {
@@ -73,6 +74,7 @@ type LoginPageData struct {
 	Message   string
 	Error     string
 	CSRFToken string
+	BasePath  string
 }
 
 // RenderLoginPage рендерит страницу входа

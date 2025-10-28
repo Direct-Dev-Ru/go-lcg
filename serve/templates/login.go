@@ -285,7 +285,7 @@ const LoginPageTemplate = `
             
             try {
                 const csrfToken = document.getElementById('csrf_token').value;
-                const response = await fetch('/api/login', {
+                const response = await fetch('{{.BasePath}}/api/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -302,7 +302,7 @@ const LoginPageTemplate = `
                 
                 if (data.success) {
                     // Успешная авторизация, перенаправляем на главную страницу
-                    window.location.href = '/';
+                    window.location.href = '{{.BasePath}}/';
                 } else {
                     // Ошибка авторизации
                     showMessage(data.error || 'Ошибка авторизации', 'error');

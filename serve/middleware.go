@@ -2,6 +2,7 @@ package serve
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
 )
@@ -15,8 +16,8 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Исключаем страницу входа и API логина из проверки
-		if r.URL.Path == "/login" || r.URL.Path == "/api/login" || r.URL.Path == "/api/validate-token" {
+		// Исключаем страницу входа и API логина из проверки (с учетом BasePath)
+		if r.URL.Path == makePath("/login") || r.URL.Path == makePath("/api/login") || r.URL.Path == makePath("/api/validate-token") {
 			next(w, r)
 			return
 		}
@@ -31,8 +32,8 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 
-			// Для веб-запросов перенаправляем на страницу входа
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			// Для веб-запросов перенаправляем на страницу входа (с учетом BasePath)
+			http.Redirect(w, r, makePath("/login"), http.StatusSeeOther)
 			return
 		}
 
@@ -50,8 +51,8 @@ func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Исключаем некоторые API endpoints
-		if r.URL.Path == "/api/login" || r.URL.Path == "/api/logout" {
+		// Исключаем некоторые API endpoints (с учетом BasePath)
+		if r.URL.Path == makePath("/api/login") || r.URL.Path == makePath("/api/logout") {
 			next(w, r)
 			return
 		}
@@ -103,7 +104,8 @@ func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 // isAPIRequest проверяет, является ли запрос API запросом
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	return len(path) >= 4 && path[:4] == "/api"
+	apiPrefix := makePath("/api")
+	return strings.HasPrefix(path, apiPrefix)
 }
 
 // RequireAuth обертка для requireAuth из auth.go
