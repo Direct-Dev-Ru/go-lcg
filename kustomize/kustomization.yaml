@@ -13,13 +13,13 @@ resources:
   - ingress-route.yaml  
 
 # Common labels
-commonLabels:
-  app: lcg
-  version: v2.0.6
-  managed-by: kustomize
+# commonLabels:
+#   app: lcg
+#   version: v2.0.5
+#   managed-by: kustomize
 
 # Images
-images:
-  - name: lcg
-    newName: kuznetcovay/lcg
-    newTag: v2.0.6
+# images:
+#   - name: lcg
+#     newName: kuznetcovay/lcg
+#     newTag: v2.0.5

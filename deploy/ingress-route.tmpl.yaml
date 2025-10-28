@@ -4,8 +4,7 @@ metadata:
   name: lcg-route
   namespace: lcg
   labels:
-    app: lcg
-    version: ${VERSION}
+    app: lcg    
 spec:
   entryPoints:
   - websecure  
