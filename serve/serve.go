@@ -3,11 +3,13 @@ package serve
 import (
 	"crypto/tls"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
+	"github.com/direct-dev-ru/linux-command-gpt/serve/templates"
 	"github.com/direct-dev-ru/linux-command-gpt/ssl"
 )
 
@@ -46,6 +48,18 @@ func StartResultServer(host, port string) error {
 	// Инициализируем CSRF менеджер
 	if err := InitCSRFManager(); err != nil {
 		return fmt.Errorf("failed to initialize CSRF manager: %v", err)
+	}
+
+	// Гарантируем наличие папки результатов и файла истории
+	if _, err := os.Stat(config.AppConfig.ResultFolder); os.IsNotExist(err) {
+		if mkErr := os.MkdirAll(config.AppConfig.ResultFolder, 0755); mkErr != nil {
+			return fmt.Errorf("failed to create results folder: %v", mkErr)
+		}
+	}
+	if _, err := os.Stat(config.AppConfig.ResultHistory); os.IsNotExist(err) {
+		if writeErr := Write(config.AppConfig.ResultHistory, []HistoryEntry{}); writeErr != nil {
+			return fmt.Errorf("failed to create history file: %v", writeErr)
+		}
 	}
 
 	addr := fmt.Sprintf("%s:%s", host, port)
@@ -138,15 +152,21 @@ func registerHTTPSRoutes() {
 	// Регистрируем все маршруты кроме главной страницы
 	registerRoutesExceptHome()
 
-	// Регистрируем главную страницу с проверкой HTTPS
+	// Регистрируем главную страницу (строго по BasePath) с проверкой HTTPS
 	http.HandleFunc(makePath("/"), func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем, пришел ли запрос по HTTP (не HTTPS)
 		if r.TLS == nil {
 			handleHTTPSRedirect(w, r)
 			return
 		}
-		// Если уже HTTPS, обрабатываем как обычно
-		AuthMiddleware(handleResultsPage)(w, r)
+		// Обрабатываем только точные пути: BasePath или BasePath/
+		bp := getBasePath()
+		p := r.URL.Path
+		if (bp == "" && (p == "/" || p == "")) || (bp != "" && (p == bp || p == bp+"/")) {
+			AuthMiddleware(handleResultsPage)(w, r)
+			return
+		}
+		renderNotFound(w, "Страница не найдена", bp)
 	})
 
 	// Регистрируем главную страницу без слэша в конце для BasePath
@@ -161,6 +181,13 @@ func registerHTTPSRoutes() {
 			}
 			// Если уже HTTPS, обрабатываем как обычно
 			AuthMiddleware(handleResultsPage)(w, r)
+		})
+	}
+
+	// Catch-all 404 для любых незарегистрированных путей (только когда BasePath задан)
+	if getBasePath() != "" {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			renderNotFound(w, "Страница не найдена", getBasePath())
 		})
 	}
 }
@@ -203,6 +230,13 @@ func registerRoutesExceptHome() {
 	// API для сохранения результатов и истории
 	http.HandleFunc(makePath("/api/save-result"), AuthMiddleware(CSRFMiddleware(handleSaveResult)))
 	http.HandleFunc(makePath("/api/add-to-history"), AuthMiddleware(CSRFMiddleware(handleAddToHistory)))
+
+	// Catch-all 404 для любых незарегистрированных путей (только когда BasePath задан)
+	if getBasePath() != "" {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			renderNotFound(w, "Страница не найдена", getBasePath())
+		})
+	}
 }
 
 // registerRoutes регистрирует все маршруты сервера
@@ -215,8 +249,17 @@ func registerRoutes() {
 	http.HandleFunc(makePath("/api/logout"), handleLogout)
 	http.HandleFunc(makePath("/api/validate-token"), handleValidateToken)
 
-	// Главная страница и файлы
-	http.HandleFunc(makePath("/"), AuthMiddleware(handleResultsPage))
+	// Главная страница (строго по BasePath) и файлы
+	http.HandleFunc(makePath("/"), func(w http.ResponseWriter, r *http.Request) {
+		// Обрабатываем только точные пути: BasePath или BasePath/
+		bp := getBasePath()
+		p := r.URL.Path
+		if (bp == "" && (p == "/" || p == "")) || (bp != "" && (p == bp || p == bp+"/")) {
+			AuthMiddleware(handleResultsPage)(w, r)
+			return
+		}
+		renderNotFound(w, "Страница не найдена", bp)
+	})
 	http.HandleFunc(makePath("/file/"), AuthMiddleware(handleFileView))
 	http.HandleFunc(makePath("/delete/"), AuthMiddleware(handleDeleteFile))
 
@@ -251,4 +294,30 @@ func registerRoutes() {
 		basePath = strings.TrimSuffix(basePath, "/")
 		http.HandleFunc(basePath, AuthMiddleware(handleResultsPage))
 	}
+
+	// Catch-all 404 для любых незарегистрированных путей (только когда BasePath задан)
+	if getBasePath() != "" {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			renderNotFound(w, "Страница не найдена", getBasePath())
+		})
+	}
+}
+
+// renderNotFound рендерит кастомную страницу 404
+func renderNotFound(w http.ResponseWriter, message, basePath string) {
+	w.WriteHeader(http.StatusNotFound)
+	data := struct {
+		Message  string
+		BasePath string
+	}{
+		Message:  message,
+		BasePath: basePath,
+	}
+	tmpl, err := template.New("not_found").Parse(templates.NotFoundTemplate)
+	if err != nil {
+		http.Error(w, "404 Not Found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = tmpl.Execute(w, data)
 }

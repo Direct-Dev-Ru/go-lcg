@@ -126,7 +126,7 @@ const FileViewTemplate = `
     <div class="container">
         <div class="header">
             <h1>📄 {{.Filename}}</h1>
-            <a href="/" class="back-btn">← Назад к списку</a>
+            <a href="{{.BasePath}}/" class="back-btn">← Назад к списку</a>
         </div>
         <div class="content">
             {{.Content}}

@@ -169,22 +169,30 @@ func formatFileSize(size int64) string {
 
 // handleFileView обрабатывает просмотр конкретного файла
 func handleFileView(w http.ResponseWriter, r *http.Request) {
-	filename := strings.TrimPrefix(r.URL.Path, "/file/")
+	// Учитываем BasePath при извлечении имени файла
+	basePath := config.AppConfig.Server.BasePath
+	var filename string
+	if basePath != "" && basePath != "/" {
+		basePath = strings.TrimSuffix(basePath, "/")
+		filename = strings.TrimPrefix(r.URL.Path, basePath+"/file/")
+	} else {
+		filename = strings.TrimPrefix(r.URL.Path, "/file/")
+	}
 	if filename == "" {
-		http.NotFound(w, r)
+		renderNotFound(w, "Файл не указан", getBasePath())
 		return
 	}
 
 	// Проверяем, что файл существует и находится в папке результатов
 	filePath := filepath.Join(config.AppConfig.ResultFolder, filename)
 	if !strings.HasPrefix(filePath, config.AppConfig.ResultFolder) {
-		http.NotFound(w, r)
+		renderNotFound(w, "Запрошенный файл недоступен", getBasePath())
 		return
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		http.NotFound(w, r)
+		renderNotFound(w, "Файл не найден или был удален", getBasePath())
 		return
 	}
 
@@ -195,9 +203,11 @@ func handleFileView(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Filename string
 		Content  template.HTML
+		BasePath string
 	}{
 		Filename: filename,
 		Content:  template.HTML(htmlContent),
+		BasePath: getBasePath(),
 	}
 
 	// Парсим и выполняем шаблон
@@ -221,22 +231,30 @@ func handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filename := strings.TrimPrefix(r.URL.Path, "/delete/")
+	// Учитываем BasePath при извлечении имени файла
+	basePath := config.AppConfig.Server.BasePath
+	var filename string
+	if basePath != "" && basePath != "/" {
+		basePath = strings.TrimSuffix(basePath, "/")
+		filename = strings.TrimPrefix(r.URL.Path, basePath+"/delete/")
+	} else {
+		filename = strings.TrimPrefix(r.URL.Path, "/delete/")
+	}
 	if filename == "" {
-		http.NotFound(w, r)
+		renderNotFound(w, "Файл не указан", getBasePath())
 		return
 	}
 
 	// Проверяем, что файл существует и находится в папке результатов
 	filePath := filepath.Join(config.AppConfig.ResultFolder, filename)
 	if !strings.HasPrefix(filePath, config.AppConfig.ResultFolder) {
-		http.NotFound(w, r)
+		renderNotFound(w, "Запрошенный файл недоступен", getBasePath())
 		return
 	}
 
 	// Проверяем, что файл существует
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		http.NotFound(w, r)
+		renderNotFound(w, "Файл не найден или уже удален", getBasePath())
 		return
 	}
 
