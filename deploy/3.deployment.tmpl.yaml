@@ -58,21 +58,18 @@ spec:
           readOnly: true
         # Health checks
         startupProbe:
-          httpGet:
-            path: /lcg
+          tcpSocket:
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5
           failureThreshold: 30
         readinessProbe:
-          httpGet:
-            path: /lcg
+          tcpSocket:
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         livenessProbe:
-          httpGet:
-            path: /lcg
+          tcpSocket:
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 60
