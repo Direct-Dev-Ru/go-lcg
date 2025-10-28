@@ -1,6 +1,7 @@
 package ssl
 
 import (
+	"slices"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -139,25 +140,22 @@ func LoadOrGenerateCert(host string) (*tls.Certificate, error) {
 // IsSecureHost проверяет, является ли хост безопасным для HTTP
 func IsSecureHost(host string) bool {
 	secureHosts := []string{"localhost", "127.0.0.1", "::1"}
-	for _, secureHost := range secureHosts {
-		if host == secureHost {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(secureHosts, host)
 }
 
 // ShouldUseHTTPS определяет, нужно ли использовать HTTPS
 func ShouldUseHTTPS(host string) bool {
+	
+	// Если явно разрешен HTTP, используем HTTP
+	if config.AppConfig.Server.AllowHTTP {
+		return false
+	}
+	
 	// Если хост не localhost/127.0.0.1, принуждаем к HTTPS
 	if !IsSecureHost(host) {
 		return true
 	}
 
-	// Если явно разрешен HTTP, используем HTTP
-	if config.AppConfig.Server.AllowHTTP {
-		return false
-	}
 
 	// По умолчанию для localhost используем HTTP
 	return false

@@ -127,15 +127,24 @@ fi
 if [ "$current_branch" != "main" ]; then
     git checkout main
     git merge --no-ff -m "Merged branch '$current_branch' into main while building $VERSION" "$current_branch"
+    git push origin main
 elif [ "$current_branch" = "main" ]; then
     log "🔄 Вы находитесь на ветке main. Слияние с release..."
     git add .
     git commit -m "Исправления в ветке $current_branch"
+    git push origin main
 fi
 
 # переключиться на ветку release и слить с веткой main
-git checkout release
-git merge --no-ff -m "Merged main into release while building $VERSION" main
+if git show-ref --quiet refs/heads/release; then
+    log "ℹ️ Branch 'release' exists. Proceeding with merge."
+    git checkout release
+    git merge --no-ff -m "Merged main into release while building $VERSION" main
+else
+    log "❌ Branch 'release' does not exist. Please create the branch before proceeding."
+    git checkout -b release
+    git merge --no-ff -m "Merged main into release while building $VERSION" main        
+fi
 
 # если тег $VERSION существует, удалить его и принудительно запушить
 tag_exists=$(git tag -l "$VERSION")
