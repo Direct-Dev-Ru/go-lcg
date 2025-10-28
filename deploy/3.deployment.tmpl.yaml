@@ -59,20 +59,20 @@ spec:
         # Health checks
         startupProbe:
           httpGet:
-            path: /login
+            path: /lcg
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5
           failureThreshold: 30
         readinessProbe:
           httpGet:
-            path: /login
+            path: /lcg
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /login
+            path: /lcg
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 60
