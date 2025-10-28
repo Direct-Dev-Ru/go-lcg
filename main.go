@@ -156,9 +156,12 @@ lcg [опции] <описание команды>
 				Debug:     c.Bool("debug"),
 			}
 			disableHistory = config.AppConfig.MainFlags.NoHistory || config.AppConfig.IsNoHistoryEnabled()
-			
+
 			config.AppConfig.MainFlags.Debug = config.AppConfig.MainFlags.Debug || config.GetEnvBool("LCG_DEBUG", false)
-			
+
+			fmt.Println("Debug:", config.AppConfig.MainFlags.Debug)
+			fmt.Println("LCG_DEBUG:", config.GetEnvBool("LCG_DEBUG", false))
+
 			args := c.Args().Slice()
 
 			if len(args) == 0 {
@@ -178,7 +181,7 @@ lcg [опции] <описание команды>
 				}
 			}
 
-			if CompileConditions.NoServe {				
+			if CompileConditions.NoServe {
 				if len(args) > 1 && args[0] == "serve" {
 					printColored("❌ Error: serve command is disabled in this build\n", colorRed)
 					os.Exit(1)
@@ -569,11 +572,9 @@ func getCommands() []*cli.Command {
 				host := c.String("host")
 				openBrowser := c.Bool("browser")
 
-				// Пробрасываем глобальный флаг debug для web-сервера
-				// Позволяет запускать: lcg -d serve -p ...
-				if c.Bool("debug") {
-					config.AppConfig.MainFlags.Debug = true
-				}
+				// Пробрасываем debug: флаг или переменная окружения LCG_DEBUG
+				// Позволяет запускать: LCG_DEBUG=1 lcg serve ... или lcg -d serve ...
+				config.AppConfig.MainFlags.Debug = c.Bool("debug") || config.GetEnvBool("LCG_DEBUG", false)
 
 				// Обновляем конфигурацию сервера с новыми параметрами
 				config.AppConfig.Server.Host = host
