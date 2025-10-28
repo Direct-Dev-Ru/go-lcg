@@ -39,11 +39,12 @@ func generateAbbreviation(appName string) string {
 
 // FileInfo содержит информацию о файле
 type FileInfo struct {
-	Name    string
-	Size    string
-	ModTime string
-	Preview template.HTML
-	Content string // Полное содержимое для поиска
+	Name        string
+	DisplayName string
+	Size        string
+	ModTime     string
+	Preview     template.HTML
+	Content     string // Полное содержимое для поиска
 }
 
 // handleResultsPage обрабатывает главную страницу со списком файлов
@@ -133,11 +134,12 @@ func getResultFiles() ([]FileInfo, error) {
 		}
 
 		files = append(files, FileInfo{
-			Name:    entry.Name(),
-			Size:    formatFileSize(info.Size()),
-			ModTime: info.ModTime().Format("02.01.2006 15:04"),
-			Preview: template.HTML(preview),
-			Content: fullContent,
+			Name:        entry.Name(),
+			DisplayName: formatFileDisplayName(entry.Name()),
+			Size:        formatFileSize(info.Size()),
+			ModTime:     info.ModTime().Format("02.01.2006 15:04"),
+			Preview:     template.HTML(preview),
+			Content:     fullContent,
 		})
 	}
 
@@ -165,6 +167,65 @@ func formatFileSize(size int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
+}
+
+// formatFileDisplayName преобразует имя файла вида
+// gpt_request_GigaChat-2-Max_2025-10-22_13-50-13.md
+// в "Gpt Request GigaChat 2 Max — 2025-10-22 13:50:13"
+func formatFileDisplayName(filename string) string {
+	name := strings.TrimSuffix(filename, ".md")
+	// Разделим на части по '_'
+	parts := strings.Split(name, "_")
+	if len(parts) == 0 {
+		return filename
+	}
+
+	// Первая часть может быть префиксом gpt/request — заменим '_' на пробел и приведем регистр
+	var words []string
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		// Заменяем '-' на пробел в словах модели/текста
+		p = strings.ReplaceAll(p, "-", " ")
+		// Разбиваем по пробелам и капитализуем каждое слово
+		for _, w := range strings.Fields(p) {
+			if w == "" {
+				continue
+			}
+			r := []rune(w)
+			r[0] = unicode.ToUpper(r[0])
+			words = append(words, string(r))
+		}
+	}
+
+	// Попробуем распознать хвост как дату и время
+	// Ищем шаблон YYYY-MM-DD_HH-MM-SS в исходном имени
+	var pretty string
+	// ожидаем последние две части — дата и время
+	if len(parts) >= 3 {
+		datePart := parts[len(parts)-2]
+		timePart := parts[len(parts)-1]
+		// заменить '-' в времени на ':'
+		timePretty := strings.ReplaceAll(timePart, "-", ":")
+		if len(datePart) == 10 && len(timePart) == 8 { // примитивная проверка
+			// Собираем текст до датных частей
+			text := strings.Join(words[:len(words)-2], " ")
+			pretty = strings.TrimSpace(text)
+			if pretty != "" {
+				pretty += " — " + datePart + " " + timePretty
+			} else {
+				pretty = datePart + " " + timePretty
+			}
+			return pretty
+		}
+	}
+
+	if len(words) > 0 {
+		pretty = strings.Join(words, " ")
+		return pretty
+	}
+	return filename
 }
 
 // handleFileView обрабатывает просмотр конкретного файла
