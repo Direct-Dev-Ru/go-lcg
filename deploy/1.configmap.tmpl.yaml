@@ -16,7 +16,7 @@ data:
   LCG_CONFIG_FOLDER: "/app/data/config"  
   LCG_NO_HISTORY: "false"
   LCG_ALLOW_EXECUTION: "false"
-  LCG_DEBUG: "false"
+  LCG_DEBUG: "true"
 
   # Настройки аутентификации
   LCG_SERVER_REQUIRE_AUTH: "true"
