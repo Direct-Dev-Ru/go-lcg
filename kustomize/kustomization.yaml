@@ -15,11 +15,11 @@ resources:
 # Common labels
 # commonLabels:
 #   app: lcg
-#   version: v2.0.12
+#   version: v2.0.13
 #   managed-by: kustomize
 
 # Images
 # images:
 #   - name: lcg
 #     newName: kuznetcovay/lcg
-#     newTag: v2.0.12
+#     newTag: v2.0.13
