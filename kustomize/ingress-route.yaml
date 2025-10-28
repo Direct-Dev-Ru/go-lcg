@@ -5,7 +5,7 @@ metadata:
   namespace: lcg
   labels:
     app: lcg
-    version: v2.0.5
+    version: v2.0.6
 spec:
   entryPoints:
   - websecure  
