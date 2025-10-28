@@ -28,7 +28,7 @@ spec:
         - configMapRef:
             name: lcg-config
         - secretRef:
-            name: lcg-secret
+            name: lcg-secrets
         env:
         # Pod information
         - name: POD_NAME

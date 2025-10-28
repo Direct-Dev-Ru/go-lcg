@@ -81,7 +81,7 @@ fi
 
 success "✅ kustomize/configmap.yaml сгенерирован успешно"
 
-if ! envsubst < deploy/deployment.tmpl.yaml > kustomize/deployment.yaml; then
+if ! envsubst < deploy/3.deployment.tmpl.yaml > kustomize/deployment.yaml; then
     error "Ошибка при генерации kustomize/deployment.yaml"
     exit 1
 fi
