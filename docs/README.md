@@ -133,10 +133,15 @@ The `serve` command provides both a web interface and REST API:
 
 **Web Interface:**
 
-- Browse results at `http://localhost:8080/`
-- Execute requests at `http://localhost:8080/run`
-- Manage prompts at `http://localhost:8080/prompts`
-- View history at `http://localhost:8080/history`
+- Browse results at `http://localhost:8080/` (or `http://localhost:8080<BASE_PATH>/` if `LCG_BASE_URL` set)
+- Execute requests at `.../run`
+- Manage prompts at `.../prompts`
+- View history at `.../history`
+
+Notes:
+- Base path: set `LCG_BASE_URL` (e.g. `/lcg`) to prefix all routes and API.
+- Custom 404: unknown paths under base path render a modern 404 page.
+- Debug: enable via flag `--debug` or env `LCG_DEBUG=1|true`.
 
 **REST API:**
 
