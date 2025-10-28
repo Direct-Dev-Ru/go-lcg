@@ -49,6 +49,12 @@ cp "$SRC_CFG" "$DST_CFG"
 
 pushd "$ROOT_DIR" >/dev/null
 
+EXTRA_FLAGS=()
+PREV_HEAD="$(git rev-parse HEAD 2>/dev/null || echo "")"
+
+git add .
+git commit --amend --no-edit || true
+
 ## Версию берём из deploy/VERSION.txt или VERSION.txt в корне
 VERSION_FILE="$ROOT_DIR/deploy/VERSION.txt"
 [[ -f "$VERSION_FILE" ]] || VERSION_FILE="$ROOT_DIR/VERSION.txt"
@@ -78,6 +84,25 @@ create_and_push_tag() {
   fi
 }
 
+move_tag_to_head() {
+  local tag="$1"
+  if [[ -z "$tag" ]]; then
+    return 0
+  fi
+  if git rev-parse "$tag" >/dev/null 2>&1; then
+    log "Переношу тег $tag на текущий коммит (HEAD)"
+    git tag -f "$tag" HEAD
+    if [[ "${NO_GIT_PUSH:-false}" != "true" ]]; then
+      log "Форс‑пуш тега $tag на origin"
+      git push -f origin "$tag"
+    else
+      log "Пропущен пуш тега (NO_GIT_PUSH=true)"
+    fi
+  else
+    log "Тега $tag нет — пропускаю перенос"
+  fi
+}
+
 fetch_token_from_k8s() {
   export KUBECONFIG=/home/su/.kube/config_hlab
   local ns="${K8S_NAMESPACE:-flux-system}"
@@ -94,11 +119,21 @@ fetch_token_from_k8s() {
 
 if [[ "$MODE" == "snapshot" ]]; then
   log "Запуск goreleaser (snapshot, без публикации)"
-  goreleaser release --snapshot --clean --config "$DST_CFG"
+  goreleaser release --snapshot --clean --config "$DST_CFG" "${EXTRA_FLAGS[@]}"
 else
   # Если версия определена и тега нет — создадим (goreleaser ориентируется на теги)
   if [[ -n "${GORELEASER_CURRENT_TAG:-}" ]]; then
     create_and_push_tag "$GORELEASER_CURRENT_TAG"
+    # Перемещаем тег на текущий HEAD (если существовал ранее, закрепим на последнем коммите)
+    move_tag_to_head "$GORELEASER_CURRENT_TAG"
+  else
+    # Если версия не задана, попробуем взять последний существующий тег и перенести его на HEAD
+    LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+    if [[ -n "$LAST_TAG" ]]; then
+      move_tag_to_head "$LAST_TAG"
+      export GORELEASER_CURRENT_TAG="$LAST_TAG"
+      log "Использую последний тег: $LAST_TAG"
+    fi
   fi
   if [[ -z "${GITHUB_TOKEN:-}" ]]; then
     log "GITHUB_TOKEN не задан — пробую получить из k8s секрета (${K8S_NAMESPACE:-flux-system}/${K8S_SECRET_NAME:-git-secrets}, ключ: password)"
@@ -116,10 +151,19 @@ else
     fi
   fi
   log "Запуск goreleaser (публикация на GitHub)"
-  goreleaser release --clean --config "$DST_CFG"
+  goreleaser release --clean --config "$DST_CFG" "${EXTRA_FLAGS[@]}"
 fi
 
 popd >/dev/null
+
+# Откатываем временный коммит, если он был
+if [[ "${TEMP_COMMIT_DONE:-false}" == "true" && -n "$PREV_HEAD" ]]; then
+  if git reset --soft "$PREV_HEAD" >/dev/null 2>&1; then
+    log "Откатил временный коммит"
+  else
+    log "Не удалось откатить временный коммит — проверьте историю вручную"
+  fi
+fi
 
 log "Готово."
 
