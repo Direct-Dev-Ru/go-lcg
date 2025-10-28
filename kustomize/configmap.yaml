@@ -17,6 +17,7 @@ data:
   LCG_NO_HISTORY: "false"
   LCG_ALLOW_EXECUTION: "false"
   LCG_DEBUG: "true"
+  LCG_PROVIDER: "proxy"
 
   # Настройки аутентификации
   LCG_SERVER_REQUIRE_AUTH: "true"
