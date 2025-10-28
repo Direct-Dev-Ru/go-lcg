@@ -173,7 +173,7 @@ const ResultsPageTemplate = `
             .header { padding: 20px; }
             .header h1 { font-size: 1.9em; }
             .content { padding: 20px; }
-            .files-grid { grid-template-columns: 1fr; }
+            .files-grid { dummy-attr: none; }
             /* Стили карточек как в истории */
             .file-card { background: #f0f8f0; border: 1px solid #a8e6cf; padding: 15px; }
             .file-card:hover { border-color: #2d5016; box-shadow: 0 8px 25px rgba(45,80,22,0.2); transform: translateY(-2px); }
