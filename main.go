@@ -60,7 +60,7 @@ func main() {
 		CompileConditions.NoServe = false
 	}
 
-	fmt.Println("Build conditions:", CompileConditions)
+	// fmt.Println("Build conditions:", CompileConditions)
 
 	_ = colorBlue
 
@@ -87,12 +87,56 @@ lcg [опции] <описание команды>
 {{.AppName}} - инструмент для генерации Linux команд из описаний на естественном языке.
 Поддерживает чтение частей промпта из файлов и позволяет сохранять, копировать или перегенерировать результаты.
 может задавать системный промпт или выбирать из предустановленных промптов.
+
 Переменные окружения:
-  LCG_HOST          Endpoint для LLM API (по умолчанию: http://192.168.87.108:11434/)
-  LCG_MODEL         Название модели (по умолчанию: codegeex4)
-  LCG_PROMPT        Текст промпта по умолчанию
-  LCG_PROVIDER      Тип провайдера: "ollama" или "proxy" (по умолчанию: ollama)
-  LCG_JWT_TOKEN     JWT токен для proxy провайдера
+
+Основные настройки:
+  LCG_HOST                Endpoint для LLM API (по умолчанию: http://192.168.87.108:11434/)
+  LCG_MODEL               Название модели (по умолчанию: hf.co/yandex/YandexGPT-5-Lite-8B-instruct-GGUF:Q4_K_M)
+  LCG_PROMPT              Текст промпта по умолчанию
+  LCG_PROVIDER            Тип провайдера: "ollama" или "proxy" (по умолчанию: ollama)
+  LCG_JWT_TOKEN           JWT токен для proxy провайдера
+  LCG_PROMPT_ID           ID промпта по умолчанию (по умолчанию: 1)
+  LCG_TIMEOUT             Таймаут запроса в секундах (по умолчанию: 300)
+  LCG_COMPLETIONS_PATH    Путь к API для завершений (по умолчанию: api/chat)
+  LCG_PROXY_URL           URL прокси для proxy провайдера (по умолчанию: /api/v1/protected/sberchat/chat)
+  LCG_API_KEY_FILE        Файл с API ключом (по умолчанию: .openai_api_key)
+  LCG_APP_NAME            Название приложения (по умолчанию: Linux Command GPT)
+
+Настройки истории и выполнения:
+  LCG_NO_HISTORY          Отключить запись истории ("1" или "true" = отключено, пусто = включено)
+  LCG_ALLOW_EXECUTION     Разрешить выполнение команд ("1" или "true" = разрешено, пусто = запрещено)
+  LCG_RESULT_FOLDER       Папка для сохранения результатов (по умолчанию: ~/.config/lcg/gpt_results)
+  LCG_RESULT_HISTORY      Файл истории результатов (по умолчанию: <result_folder>/lcg_history.json)
+  LCG_PROMPT_FOLDER       Папка для системных промптов (по умолчанию: ~/.config/lcg/gpt_sys_prompts)
+  LCG_CONFIG_FOLDER       Папка для конфигурации (по умолчанию: ~/.config/lcg/config)
+
+Настройки сервера (команда serve):
+  LCG_SERVER_PORT         Порт сервера (по умолчанию: 8080)
+  LCG_SERVER_HOST         Хост сервера (по умолчанию: localhost)
+  LCG_SERVER_ALLOW_HTTP   Разрешить HTTP соединения ("true" для localhost, "false" для других хостов)
+  LCG_SERVER_REQUIRE_AUTH Требовать аутентификацию ("1" или "true" = требуется, пусто = не требуется)
+  LCG_SERVER_PASSWORD     Пароль администратора (по умолчанию: admin#123456)
+  LCG_SERVER_SSL_CERT_FILE Путь к SSL сертификату
+  LCG_SERVER_SSL_KEY_FILE  Путь к приватному ключу SSL
+  LCG_DOMAIN              Домен для сервера (по умолчанию: значение LCG_SERVER_HOST)
+  LCG_COOKIE_SECURE       Безопасные cookie ("1" или "true" = включено, пусто = выключено)
+  LCG_COOKIE_PATH         Путь для cookie (по умолчанию: /lcg)
+  LCG_COOKIE_TTL_HOURS    Время жизни cookie в часах (по умолчанию: 168)
+  LCG_BASE_URL            Базовый URL приложения (по умолчанию: /lcg)
+  LCG_HEALTH_URL          URL для проверки здоровья API (по умолчанию: /api/v1/protected/sberchat/health)
+
+Настройки валидации:
+  LCG_MAX_SYSTEM_PROMPT_LENGTH    Максимальная длина системного промпта (по умолчанию: 2000)
+  LCG_MAX_USER_MESSAGE_LENGTH     Максимальная длина пользовательского сообщения (по умолчанию: 4000)
+  LCG_MAX_PROMPT_NAME_LENGTH      Максимальная длина названия промпта (по умолчанию: 2000)
+  LCG_MAX_PROMPT_DESC_LENGTH      Максимальная длина описания промпта (по умолчанию: 5000)
+  LCG_MAX_COMMAND_LENGTH          Максимальная длина команды (по умолчанию: 8000)
+  LCG_MAX_EXPLANATION_LENGTH      Максимальная длина объяснения (по умолчанию: 20000)
+
+Отладка и браузер:
+  LCG_DEBUG               Включить режим отладки ("1" или "true" = включено, пусто = выключено)
+  LCG_BROWSER_PATH        Путь к браузеру для автоматического открытия (команда serve --browser)
 `,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -159,8 +203,8 @@ lcg [опции] <описание команды>
 
 			config.AppConfig.MainFlags.Debug = config.AppConfig.MainFlags.Debug || config.GetEnvBool("LCG_DEBUG", false)
 
-			fmt.Println("Debug:", config.AppConfig.MainFlags.Debug)
-			fmt.Println("LCG_DEBUG:", config.GetEnvBool("LCG_DEBUG", false))
+			// fmt.Println("Debug:", config.AppConfig.MainFlags.Debug)
+			// fmt.Println("LCG_DEBUG:", config.GetEnvBool("LCG_DEBUG", false))
 
 			args := c.Args().Slice()
 
