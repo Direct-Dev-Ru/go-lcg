@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  lcg-ollama:
+    build:
+      context: ../..
+      dockerfile: Dockerfiles/OllamaServer/Dockerfile
+    container_name: lcg-ollama
+    ports:
+      - "8080:8080"  # LCG веб-сервер
+      - "11434:11434"  # Ollama API
+    environment:
+      # Настройки LCG
+      - LCG_PROVIDER=ollama
+      - LCG_HOST=http://127.0.0.1:11434/
+      - LCG_MODEL=codegeex4
+      - LCG_RESULT_FOLDER=/app/data/results
+      - LCG_PROMPT_FOLDER=/app/data/prompts
+      - LCG_CONFIG_FOLDER=/app/data/config
+      - LCG_SERVER_HOST=0.0.0.0
+      - LCG_SERVER_PORT=8080
+      - LCG_SERVER_ALLOW_HTTP=true
+      # Настройки Ollama
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_PORT=11434
+      - OLLAMA_ORIGINS=*
+      # Опционально: настройки безопасности
+      - LCG_SERVER_REQUIRE_AUTH=false
+      - LCG_SERVER_PASSWORD=admin#123456
+    volumes:
+      # Персистентное хранилище для данных Ollama
+      - ollama-data:/home/ollama/.ollama
+      # Персистентное хранилище для результатов LCG
+      - lcg-results:/app/data/results
+      - lcg-prompts:/app/data/prompts
+      - lcg-config:/app/data/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  ollama-data:
+    driver: local
+  lcg-results:
+    driver: local
+  lcg-prompts:
+    driver: local
+  lcg-config:
+    driver: local
+

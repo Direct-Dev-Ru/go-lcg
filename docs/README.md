@@ -35,10 +35,17 @@ Explanations:
 
 Clipboard support requires `xclip` or `xsel`.
 
-## What's new in 2.0.1
+## What's new in 2.0.14
 
-- Mobile UI improvements: better responsiveness (buttons, fonts, spacing) and reduced motion support
-- Public REST endpoint: `POST /execute` (curl-only) for programmatic access — see `API_GUIDE.md`
+- Authentication: JWT-based authentication with HTTP-only cookies
+- CSRF protection: Full CSRF protection with tokens and middleware
+- Security: Enhanced security with token validation and sessions
+- Kubernetes deployment: Full set of manifests for Kubernetes deployment with Traefik
+- Reverse Proxy: Support for working behind reverse proxy with cookie configuration
+- Web interface: Improved web interface with modern design
+- Monitoring: Prometheus metrics and ServiceMonitor
+- Scaling: HPA for automatic scaling
+- Testing: CSRF protection testing tools
 
 ## Environment
 
