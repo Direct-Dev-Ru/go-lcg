@@ -52,7 +52,7 @@ run: ## Запустить контейнер (Docker)
 		-v lcg-results:/app/data/results \
 		-v lcg-prompts:/app/data/prompts \
 		-v lcg-config:/app/data/config \
-		${IMAGE_NAME}:${IMAGE_TAG}
+		${IMAGE_NAME}:${IMAGE_TAG} ollama serve
 	@echo "Контейнер ${CONTAINER_NAME} запущен"
 
 run-podman: ## Запустить контейнер (Podman)
@@ -69,7 +69,7 @@ run-podman: ## Запустить контейнер (Podman)
 		-v lcg-results:/app/data/results \
 		-v lcg-prompts:/app/data/prompts \
 		-v lcg-config:/app/data/config \
-		${IMAGE_NAME}:${IMAGE_TAG}
+		${IMAGE_NAME}:${IMAGE_TAG} ollama serve
 	@echo "Контейнер ${CONTAINER_NAME} запущен"
 
 run-podman-nodemon: ## Запустить контейнер (Podman) без -d
@@ -86,7 +86,7 @@ run-podman-nodemon: ## Запустить контейнер (Podman) без -d
 		-v lcg-results:/app/data/results \
 		-v lcg-prompts:/app/data/prompts \
 		-v lcg-config:/app/data/config \
-		${IMAGE_NAME}:${IMAGE_TAG}
+		${IMAGE_NAME}:${IMAGE_TAG} ollama serve
 	@echo "Контейнер ${CONTAINER_NAME} запущен"
 
 stop: ## Остановить контейнер (Docker)

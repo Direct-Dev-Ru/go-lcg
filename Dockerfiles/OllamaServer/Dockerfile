@@ -1,6 +1,10 @@
 # Используем готовый образ Ollama
 FROM localhost/ollama_packed:latest
 
+RUN apt-get update && apt-get install -y --no-install-recommends bash && apt-get install -y --no-install-recommends curl \
+&& apt-get install -y --no-install-recommends jq && apt-get install -y --no-install-recommends wget 
+
+
 # Устанавливаем bash если его нет (базовый образ ollama может быть на разных дистрибутивах)
 RUN if ! command -v bash >/dev/null 2>&1; then \
         if command -v apk >/dev/null 2>&1; then \
@@ -72,6 +76,8 @@ ENV LCG_SERVER_HOST=0.0.0.0
 ENV LCG_SERVER_PORT=8080
 ENV LCG_DOMAIN="remote.ollama-server.ru"
 ENV LCG_COOKIE_PATH="/lcg"
+# ENV LCG_FORCE_NO_CSRF=true
+
 # ENV LCG_SERVER_ALLOW_HTTP=true
 # ENV OLLAMA_HOST=127.0.0.1
 # ENV OLLAMA_PORT=11434
