@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
@@ -174,16 +172,9 @@ func setCSRFCookie(w http.ResponseWriter, token string) {
 		MaxAge:   CSRFTokenLifetimeSeconds, // Минимум 12 часов в секундах
 	}
 
-	// Устанавливаем Domain только если это не IP адрес и не 0.0.0.0
-	// При доступе по IP адресу не устанавливаем Domain, иначе cookie не будет работать
+	// Добавляем домен если указан
 	if config.AppConfig.Server.Domain != "" {
-		domain := config.AppConfig.Server.Domain
-		// Проверяем, не является ли домен IP адресом или 0.0.0.0
-		if !isIPAddress(domain) && domain != "0.0.0.0" && domain != "::" && domain != "::1" {
-			cookie.Domain = domain
-		}
-		// Если domain пустой, 0.0.0.0 или IP адрес - не устанавливаем Domain
-		// Браузер автоматически применит cookie к текущему хосту
+		cookie.Domain = config.AppConfig.Server.Domain
 	}
 
 	http.SetCookie(w, cookie)
@@ -201,12 +192,9 @@ func СlearCSRFCookie(w http.ResponseWriter) {
 		MaxAge:   -1,
 	}
 
-	// Устанавливаем Domain только если это не IP адрес
+	// Добавляем домен если указан
 	if config.AppConfig.Server.Domain != "" {
-		domain := config.AppConfig.Server.Domain
-		if !isIPAddress(domain) && domain != "0.0.0.0" && domain != "::" && domain != "::1" {
-			cookie.Domain = domain
-		}
+		cookie.Domain = config.AppConfig.Server.Domain
 	}
 
 	http.SetCookie(w, cookie)
@@ -281,18 +269,4 @@ func InitCSRFManager() error {
 // GetCSRFManager возвращает глобальный CSRF менеджер
 func GetCSRFManager() *CSRFManager {
 	return csrfManager
-}
-
-// isIPAddress проверяет, является ли строка IPv4 адресом
-func isIPAddress(s string) bool {
-	parts := strings.Split(s, ".")
-	if len(parts) != 4 {
-		return false
-	}
-	for _, part := range parts {
-		if num, err := strconv.Atoi(part); err != nil || num < 0 || num > 255 {
-			return false
-		}
-	}
-	return true
 }
