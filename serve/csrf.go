@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/direct-dev-ru/linux-command-gpt/config"
@@ -20,10 +22,72 @@ const (
 	CSRFTokenLifetimeSeconds = CSRFTokenLifetimeHours * 60 * 60
 )
 
-// csrfDebugPrint выводит отладочную информацию только если включен debug режим
-func csrfDebugPrint(format string, args ...interface{}) {
+var (
+	// csrfDebugFile файл для отладочного вывода CSRF
+	csrfDebugFile *os.File
+	// csrfDebugFileMutex мьютекс для безопасной записи в файл
+	csrfDebugFileMutex sync.Mutex
+)
+
+// initCSRFDebugFile инициализирует файл для отладочного вывода CSRF
+func initCSRFDebugFile() error {
+	debugFile := os.Getenv("LCG_CSRF_DEBUG_FILE")
+	if debugFile == "" {
+		return nil // Файл не указан, ничего не делаем
+	}
+
+	// Создаем директорию для файла, если нужно
+	dir := filepath.Dir(debugFile)
+	if dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory for CSRF debug file %s: %v", dir, err)
+		}
+	}
+
+	// Создаем/перезаписываем файл
+	file, err := os.Create(debugFile)
+	if err != nil {
+		return fmt.Errorf("failed to create CSRF debug file %s: %v", debugFile, err)
+	}
+
+	csrfDebugFileMutex.Lock()
+	// Закрываем старый файл, если был открыт
+	if csrfDebugFile != nil {
+		csrfDebugFile.Close()
+	}
+	csrfDebugFile = file
+	csrfDebugFileMutex.Unlock()
+
+	// Записываем заголовок
+	header := fmt.Sprintf("=== CSRF Debug Log Started at %s ===\n", time.Now().Format(time.RFC3339))
+	if _, err := csrfDebugFile.WriteString(header); err != nil {
+		return fmt.Errorf("failed to write header to CSRF debug file: %v", err)
+	}
+	if err := csrfDebugFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync CSRF debug file: %v", err)
+	}
+
+	return nil
+}
+
+// csrfDebugPrint выводит отладочную информацию
+// Если установлен LCG_CSRF_DEBUG_FILE - всегда пишет в файл (независимо от debug режима)
+// Если включен debug режим - также пишет в консоль
+func csrfDebugPrint(format string, args ...any) {
+	message := fmt.Sprintf(format, args...)
+
+	// Записываем в файл, если он установлен
+	csrfDebugFileMutex.Lock()
+	if csrfDebugFile != nil {
+		csrfDebugFile.WriteString(message)
+		// Синхронизируем сразу для отладки (может быть медленно, но гарантирует запись)
+		csrfDebugFile.Sync()
+	}
+	csrfDebugFileMutex.Unlock()
+
+	// Записываем в консоль, если включен debug режим
 	if config.AppConfig.MainFlags.Debug {
-		fmt.Printf(format, args...)
+		fmt.Print(message)
 	}
 }
 
@@ -336,6 +400,11 @@ var csrfManager *CSRFManager
 
 // InitCSRFManager инициализирует глобальный CSRF менеджер
 func InitCSRFManager() error {
+	// Инициализируем файл для отладки CSRF, если указан LCG_CSRF_DEBUG_FILE
+	if err := initCSRFDebugFile(); err != nil {
+		return fmt.Errorf("failed to initialize CSRF debug file: %v", err)
+	}
+
 	var err error
 	csrfManager, err = NewCSRFManager()
 	return err

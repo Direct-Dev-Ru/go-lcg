@@ -138,19 +138,39 @@ func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Получаем CSRF токен из cookie для сравнения
 		csrfTokenFromCookie := GetCSRFTokenFromCookie(r)
+		valid := true
 		if csrfTokenFromCookie != "" {
 			csrfDebugPrint("[CSRF MIDDLEWARE] CSRF токен из cookie (первые 50 символов): %s...\n",
 				safeSubstring(csrfTokenFromCookie, 0, 50))
 			if csrfTokenFromCookie != csrfToken {
 				csrfDebugPrint("[CSRF MIDDLEWARE] ⚠️  ВНИМАНИЕ: Токен из cookie отличается от токена в запросе!\n")
+				valid = false
 			} else {
 				csrfDebugPrint("[CSRF MIDDLEWARE] ✅ Токен из cookie совпадает с токеном в запросе\n")
+				valid = true
 			}
 		} else {
 			csrfDebugPrint("[CSRF MIDDLEWARE] ⚠️  ВНИМАНИЕ: CSRF токен не найден в cookie!\n")
+			valid = false
 		}
 
 		// Проверяем CSRF токен
+
+		if !valid {
+			csrfDebugPrint("[CSRF MIDDLEWARE] ❌ ОШИБКА: Валидация CSRF токена не прошла!\n")
+			// Для API запросов возвращаем JSON ошибку
+			if isAPIRequest(r) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"success": false, "error": "Invalid CSRF token"}`))
+				return
+			}
+
+			// Для веб-запросов возвращаем ошибку
+			http.Error(w, "Invalid OR Empty CSRF token", http.StatusForbidden)
+			return
+		}
+
 		csrfManager := GetCSRFManager()
 		if csrfManager == nil {
 			csrfDebugPrint("[CSRF MIDDLEWARE] ❌ ОШИБКА: CSRF менеджер не инициализирован!\n")
@@ -165,7 +185,7 @@ func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		csrfDebugPrint("[CSRF MIDDLEWARE] Вызов ValidateToken с токеном и sessionID: %s\n", sessionID)
-		valid := csrfManager.ValidateToken(csrfToken, sessionID)
+		valid = csrfManager.ValidateToken(csrfToken, sessionID)
 		csrfDebugPrint("[CSRF MIDDLEWARE] Результат ValidateToken: %t\n", valid)
 
 		if !valid {

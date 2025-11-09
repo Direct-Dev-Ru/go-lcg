@@ -5,7 +5,7 @@ metadata:
   namespace: lcg
   labels:
     app: lcg
-    version: v.2.0.21
+    version: v.2.0.25
 spec:
   replicas: 1
   selector:
@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: lcg
-        image: kuznetcovay/lcg:v.2.0.21
+        image: kuznetcovay/lcg:v.2.0.25
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
