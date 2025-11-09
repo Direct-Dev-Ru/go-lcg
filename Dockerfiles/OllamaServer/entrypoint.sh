@@ -51,13 +51,13 @@ mkdir -p "${LCG_PROMPT_FOLDER:-/app/data/prompts}"
 mkdir -p "${LCG_CONFIG_FOLDER:-/app/data/config}"
 
 # Настройка переменных окружения для Ollama
-export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1}"
+export OLLAMA_HOST="${OLLAMA_HOST:-0.0.0.0}"
 export OLLAMA_PORT="${OLLAMA_PORT:-11434}"
 export OLLAMA_ORIGINS="*"
 
 # Настройка переменных окружения для LCG
 export LCG_PROVIDER="${LCG_PROVIDER:-ollama}"
-export LCG_HOST="${LCG_HOST:-http://127.0.0.1:11434/}"
+export LCG_HOST="${LCG_HOST:-http://0.0.0.0:11434/}"
 export LCG_MODEL="${LCG_MODEL:-qwen2.5-coder:1.5b}"
 export LCG_RESULT_FOLDER="${LCG_RESULT_FOLDER:-/app/data/results}"
 export LCG_PROMPT_FOLDER="${LCG_PROMPT_FOLDER:-/app/data/prompts}"

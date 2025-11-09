@@ -13,6 +13,13 @@ import (
 	"github.com/direct-dev-ru/linux-command-gpt/config"
 )
 
+const (
+	// CSRFTokenLifetimeHours минимальное время жизни CSRF токена в часах (не менее 12 часов)
+	CSRFTokenLifetimeHours = 12
+	// CSRFTokenLifetimeSeconds минимальное время жизни CSRF токена в секундах
+	CSRFTokenLifetimeSeconds = CSRFTokenLifetimeHours * 60 * 60
+)
+
 // CSRFManager управляет CSRF токенами
 type CSRFManager struct {
 	secretKey []byte
@@ -113,13 +120,14 @@ func (c *CSRFManager) ValidateToken(token, userID string) bool {
 		return false
 	}
 
-	// Проверяем время жизни токена (24 часа)
+	// Проверяем время жизни токена (минимум 12 часов)
 	timestamp, err := parseInt64(timestampStr)
 	if err != nil {
 		return false
 	}
 
-	if time.Now().Unix()-timestamp > 24*60*60 {
+	// Минимальное время жизни токена: 12 часов (не менее 12 часов согласно требованиям)
+	if time.Now().Unix()-timestamp > CSRFTokenLifetimeSeconds {
 		return false
 	}
 
@@ -153,14 +161,15 @@ func GetCSRFTokenFromCookie(r *http.Request) string {
 
 // setCSRFCookie устанавливает CSRF токен в cookie
 func setCSRFCookie(w http.ResponseWriter, token string) {
+	// Минимальное время жизни токена: 12 часов (не менее 12 часов согласно требованиям)
 	cookie := &http.Cookie{
 		Name:     "csrf_token",
 		Value:    token,
 		Path:     config.AppConfig.Server.CookiePath,
 		HttpOnly: true,
 		Secure:   config.AppConfig.Server.CookieSecure,
-		SameSite: http.SameSiteLaxMode, // Более мягкий режим для reverse proxy
-		MaxAge:   1 * 60 * 60,
+		SameSite: http.SameSiteLaxMode,     // Более мягкий режим для reverse proxy
+		MaxAge:   CSRFTokenLifetimeSeconds, // Минимум 12 часов в секундах
 	}
 
 	// Добавляем домен если указан
