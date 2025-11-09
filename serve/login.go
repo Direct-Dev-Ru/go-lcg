@@ -3,7 +3,6 @@ package serve
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"html/template"
 	"net/http"
 
@@ -93,7 +92,7 @@ func RenderLoginPage(w http.ResponseWriter, data LoginPageData) error {
 func getSessionID(r *http.Request) string {
 	// Пытаемся получить из cookie
 	if cookie, err := r.Cookie("session_id"); err == nil {
-		fmt.Printf("[CSRF DEBUG] SessionID получен из cookie: %s\n", cookie.Value)
+		csrfDebugPrint("[CSRF DEBUG] SessionID получен из cookie: %s\n", cookie.Value)
 		return cookie.Value
 	}
 
@@ -101,12 +100,12 @@ func getSessionID(r *http.Request) string {
 	ip := r.RemoteAddr
 	userAgent := r.Header.Get("User-Agent")
 
-	fmt.Printf("[CSRF DEBUG] SessionID не найден в cookie. Генерация нового на основе IP=%s, User-Agent (первые 50 символов): %s...\n",
+	csrfDebugPrint("[CSRF DEBUG] SessionID не найден в cookie. Генерация нового на основе IP=%s, User-Agent (первые 50 символов): %s...\n",
 		ip, safeSubstring(userAgent, 0, 50))
 
 	// Создаем простой хеш для сессии
 	hash := sha256.Sum256([]byte(ip + userAgent))
 	sessionID := hex.EncodeToString(hash[:])[:16]
-	fmt.Printf("[CSRF DEBUG] Сгенерирован SessionID: %s\n", sessionID)
+	csrfDebugPrint("[CSRF DEBUG] Сгенерирован SessionID: %s\n", sessionID)
 	return sessionID
 }

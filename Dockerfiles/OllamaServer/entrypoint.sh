@@ -65,6 +65,11 @@ export LCG_CONFIG_FOLDER="${LCG_CONFIG_FOLDER:-/app/data/config}"
 export LCG_SERVER_HOST="${LCG_SERVER_HOST:-0.0.0.0}"
 export LCG_SERVER_PORT="${LCG_SERVER_PORT:-8080}"
 export LCG_SERVER_ALLOW_HTTP="${LCG_SERVER_ALLOW_HTTP:-false}"
+export LCG_FORCE_NO_CSRF="${LCG_FORCE_NO_CSRF:-true}"
+
+if [ "$LCG_FORCE_NO_CSRF" = "true" ]; then
+    info "CSRF проверка отключена через LCG_FORCE_NO_CSRF"
+fi
 
 log "=========================================="
 log "Запуск LCG с Ollama сервером"

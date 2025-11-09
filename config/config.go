@@ -58,6 +58,7 @@ type ServerConfig struct {
 	CookieSecure   bool
 	CookiePath     string
 	CookieTTLHours int
+	ForceNoCSRF    bool
 }
 
 type ValidationConfig struct {
@@ -166,6 +167,7 @@ func Load() Config {
 			BasePath:       getEnv("LCG_BASE_URL", "/lcg"),
 			HealthUrl:      getEnv("LCG_HEALTH_URL", "/api/v1/protected/sberchat/health"),
 			ProxyUrl:       getEnv("LCG_PROXY_URL", "/api/v1/protected/sberchat/chat"),
+			ForceNoCSRF:    isForceNoCSRF(),
 		},
 		Validation: ValidationConfig{
 			MaxSystemPromptLength: getEnvInt("LCG_MAX_SYSTEM_PROMPT_LENGTH", 2000),
@@ -207,6 +209,15 @@ func isServerRequireAuth() bool {
 
 func isCookieSecure() bool {
 	v := strings.TrimSpace(getEnv("LCG_COOKIE_SECURE", ""))
+	if v == "" {
+		return false
+	}
+	vLower := strings.ToLower(v)
+	return vLower == "1" || vLower == "true"
+}
+
+func isForceNoCSRF() bool {
+	v := strings.TrimSpace(getEnv("LCG_FORCE_NO_CSRF", ""))
 	if v == "" {
 		return false
 	}
