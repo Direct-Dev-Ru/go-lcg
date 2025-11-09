@@ -23,13 +23,26 @@ help: ## Показать справку
 	@echo "  make podman-compose-up   - Запустить через podman-compose"
 	@echo "  make podman-compose-down - Остановить podman-compose"
 
-build: ## Собрать Docker образ
+build: ## Собрать Docker образ (требует собранных бинарников в dist/)
+	@echo "⚠️  Убедитесь, что бинарники собраны: goreleaser build --snapshot --clean"
 	docker build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(IMAGE_TAG) $(CONTEXT)
 	@echo "Образ $(IMAGE_NAME):$(IMAGE_TAG) успешно собран"
 
-build-podman: ## Собрать Podman образ
+build-podman: ## Собрать Podman образ (требует собранных бинарников в dist/)
+	@echo "⚠️  Убедитесь, что бинарники собраны: goreleaser build --snapshot --clean"
 	podman build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(IMAGE_TAG) $(CONTEXT)
 	@echo "Образ $(IMAGE_NAME):$(IMAGE_TAG) успешно собран"
+
+build-binaries: ## Собрать бинарники перед сборкой образа
+	@echo "Сборка бинарников..."
+	cd $(CONTEXT) && goreleaser build --snapshot --clean
+	@echo "Бинарники собраны в $(CONTEXT)/dist/"
+
+build-all: build-binaries build ## Собрать бинарники и Docker образ
+	@echo "✅ Все готово!"
+
+build-all-podman: build-binaries build-podman ## Собрать бинарники и Podman образ
+	@echo "✅ Все готово!"
 
 run: ## Запустить контейнер (Docker)
 	docker run -d \

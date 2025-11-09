@@ -4,7 +4,17 @@
 
 1. Убедитесь, что у вас установлен Docker или Podman
 2. Клонируйте репозиторий (если еще не сделали)
-3. Перейдите в папку с Dockerfile
+3. Соберите бинарники (требуется перед сборкой образа)
+
+```bash
+# Из корня проекта
+goreleaser build --snapshot --clean
+
+# Или используйте скрипт
+./deploy/4.build-binaries.sh v2.0.15
+```
+
+4. Перейдите в папку с Dockerfile
 
 ```bash
 cd Dockerfiles/OllamaServer
@@ -15,14 +25,16 @@ cd Dockerfiles/OllamaServer
 ### Вариант 1: Docker Compose (рекомендуется)
 
 ```bash
+# Важно: убедитесь, что бинарники собраны в ../../dist/
 docker-compose up -d
 ```
 
 ### Вариант 2: Ручная сборка и запуск
 
 ```bash
-# Сборка образа
-docker build -f Dockerfile -t lcg-ollama:latest ../..
+# Сборка образа (контекст должен быть корень проекта)
+cd ../..  # Переходим в корень проекта
+docker build -f Dockerfiles/OllamaServer/Dockerfile -t lcg-ollama:latest .
 
 # Запуск контейнера
 docker run -d \
@@ -45,8 +57,9 @@ podman-compose -f podman-compose.yml up -d
 ### Вариант 2: Ручная сборка и запуск
 
 ```bash
-# Сборка образа
-podman build -f Dockerfile -t lcg-ollama:latest ../..
+# Сборка образа (контекст должен быть корень проекта)
+cd ../..  # Переходим в корень проекта
+podman build -f Dockerfiles/OllamaServer/Dockerfile -t lcg-ollama:latest .
 
 # Запуск контейнера
 podman run -d \

@@ -7,62 +7,111 @@
 ## 📋 Описание
 
 Контейнер автоматически запускает:
-1. **Ollama сервер** (v0.9.5) на порту 11434
-2. **LCG веб-сервер** на порту 8080
+
+1 **Ollama сервер** (v0.9.5) на порту 11434
+
+2 **LCG веб-сервер** на порту 8080
 
 Ollama используется как провайдер LLM для генерации Linux команд.
 
 ## 🚀 Быстрый старт
 
+### Предварительные требования
+
+Перед сборкой Docker образа необходимо собрать бинарники:
+
+```bash
+# Из корня проекта
+# Используйте goreleaser для сборки бинарников
+goreleaser build --snapshot --clean
+
+# Или используйте скрипт сборки
+./deploy/4.build-binaries.sh v2.0.15
+```
+
+Убедитесь, что в папке `dist/` есть бинарники:
+
+- `dist/lcg_linux_amd64_v1/lcg_*` для amd64
+- `dist/lcg_linux_arm64_v8.0/lcg_*` для arm64
+
 ### Сборка образа
 
 #### Docker
+
 ```bash
-# Из корня проекта
+# Из корня проекта (важно: контекст должен быть корень проекта)
 docker build -f Dockerfiles/OllamaServer/Dockerfile -t lcg-ollama:latest .
+
+# Или с указанием архитектуры
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -f Dockerfiles/OllamaServer/Dockerfile \
+  -t lcg-ollama:latest .
 ```
 
 #### Podman
+
 ```bash
 # Из корня проекта
 podman build -f Dockerfiles/OllamaServer/Dockerfile -t lcg-ollama:latest .
+
+# Или с указанием архитектуры
+podman build \
+  --platform linux/amd64,linux/arm64 \
+  -f Dockerfiles/OllamaServer/Dockerfile \
+  -t lcg-ollama:latest .
 ```
 
 ### Запуск контейнера
 
-#### Docker
+#### Docker run
+
 ```bash
 docker run -d \
   --name lcg-ollama \
-  -p 8080:8080 \
-  -p 11434:11434 \
+  -p 8080:8080 \  
   lcg-ollama:latest
+  ollama serve
 ```
 
-#### Podman
+#### Podman run
+
 ```bash
 podman run -d \
   --name lcg-ollama \
-  -p 8080:8080 \
-  -p 11434:11434 \
-  lcg-ollama:latest
+  -p 8989:8080 \
+  --restart always \
+  lcg-ollama:latest \
+  ollama serve
 ```
+
+когда контейнер запущен на удаленном хосте - можете воспользоваться консольными возможностями утилиты lcg следующим образом
+
+``` bash
+ssh user@[host_where_contaier_running] 'podman exec -it $(podman ps -q --filter \"ancestor=localhost/lcg-ollama:latest\") lcg [your query]
+```
+
+``` bash
+ssh user@[host_where_contaier_running] 'podman exec -it $(podman ps -q --filter "ancestor=localhost/lcg-ollama:latest") /bin/sh -c "export LCG_MODEL=qwen3:0.6b && lcg config --full"'
 
 ### Использование docker-compose / podman-compose
 
 #### Docker Compose
+
 ```bash
 cd Dockerfiles/OllamaServer
 docker-compose up -d
 ```
 
 #### Podman Compose
+
 ```bash
 cd Dockerfiles/OllamaServer
 podman-compose -f podman-compose.yml up -d
 ```
 
 Или используйте встроенную поддержку Podman:
+
 ```bash
 cd Dockerfiles/OllamaServer
 podman play kube podman-compose.yml
@@ -72,8 +121,8 @@ podman play kube podman-compose.yml
 
 После запуска контейнера доступны:
 
-- **LCG веб-интерфейс**: http://localhost:8080
-- **Ollama API**: http://localhost:11434
+- **LCG веб-интерфейс**: <http://localhost:8080>
+- **Ollama API**: <http://localhost:11434>
 
 ## ⚙️ Переменные окружения
 
@@ -278,7 +327,8 @@ podman logs -f lcg-ollama
 
 ### Просмотр логов
 
-#### Docker
+#### Docker log
+
 ```bash
 # Логи контейнера
 docker logs lcg-ollama
@@ -287,7 +337,8 @@ docker logs lcg-ollama
 docker logs -f lcg-ollama
 ```
 
-#### Podman
+#### Podman log
+
 ```bash
 # Логи контейнера
 podman logs lcg-ollama
@@ -298,24 +349,28 @@ podman logs -f lcg-ollama
 
 ### Подключение к контейнеру
 
-#### Docker
+#### Docker exec
+
 ```bash
 docker exec -it lcg-ollama sh
 ```
 
-#### Podman
+#### Podman exec
+
 ```bash
 podman exec -it lcg-ollama sh
 ```
 
 ### Проверка процессов
 
-#### Docker
+#### Docker check ps
+
 ```bash
 docker exec lcg-ollama ps aux
 ```
 
-#### Podman
+#### Podman  check ps
+
 ```bash
 podman exec lcg-ollama ps aux
 ```
@@ -325,6 +380,7 @@ podman exec lcg-ollama ps aux
 ### Рекомендации для продакшена
 
 1. **Используйте аутентификацию**:
+
    ```bash
    -e LCG_SERVER_REQUIRE_AUTH=true
    -e LCG_SERVER_PASSWORD=strong_password
@@ -339,6 +395,7 @@ podman exec lcg-ollama ps aux
    - Используйте SSL сертификаты
 
 4. **Ограничьте ресурсы**:
+
    ```bash
    docker run -d \
      --name lcg-ollama \
@@ -390,8 +447,8 @@ docker-compose up -d
 ## ❓ Поддержка
 
 При возникновении проблем:
+
 1. Проверьте логи: `docker logs lcg-ollama`
 2. Проверьте переменные окружения
 3. Убедитесь, что порты не заняты
 4. Проверьте, что модели загружены в Ollama
-

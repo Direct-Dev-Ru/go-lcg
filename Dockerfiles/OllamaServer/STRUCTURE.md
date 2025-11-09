@@ -19,14 +19,21 @@ Dockerfiles/OllamaServer/
 ## Описание файлов
 
 ### Dockerfile
-Multi-stage Dockerfile, который:
-1. Собирает бинарник LCG из исходного кода
-2. Устанавливает Ollama 0.9.5
-3. Создает пользователя ollama
-4. Настраивает рабочее окружение
+
+Dockerfile, который:
+
+1. Использует готовый образ `ollama/ollama:0.9.5` как базовый
+2. Копирует предварительно собранный бинарник LCG из папки `dist/`
+3. Выбирает правильный бинарник в зависимости от архитектуры (amd64/arm64)
+4. Устанавливает entrypoint.sh для запуска обоих сервисов
+5. Настраивает рабочее окружение и переменные окружения
+
+**Важно**: Перед сборкой образа необходимо собрать бинарники с помощью `goreleaser build --snapshot --clean`
 
 ### entrypoint.sh
+
 Скрипт запуска, который:
+
 1. Запускает Ollama сервер в фоне
 2. Ожидает готовности Ollama API
 3. Запускает LCG сервер в фоне
@@ -34,21 +41,27 @@ Multi-stage Dockerfile, который:
 5. Корректно обрабатывает сигналы завершения
 
 ### docker-compose.yml / podman-compose.yml
+
 Конфигурация для запуска через compose:
+
 - Настройки портов
 - Переменные окружения
 - Volumes для персистентного хранения
 - Healthcheck
 
 ### Makefile
+
 Удобные команды для:
+
 - Сборки образа
 - Запуска/остановки контейнера
 - Просмотра логов
 - Работы с compose
 
 ### README.md
+
 Полная документация с:
+
 - Описанием функциональности
 - Инструкциями по установке
 - Настройками переменных окружения
@@ -56,6 +69,7 @@ Multi-stage Dockerfile, который:
 - Решением проблем
 
 ### QUICKSTART.md
+
 Краткое руководство для быстрого старта.
 
 ## Порты
@@ -73,6 +87,7 @@ Multi-stage Dockerfile, который:
 ## Переменные окружения
 
 Основные переменные (см. README.md для полного списка):
+
 - `LCG_PROVIDER=ollama`
 - `LCG_HOST=http://127.0.0.1:11434/`
 - `LCG_MODEL=codegeex4`
@@ -81,31 +96,48 @@ Multi-stage Dockerfile, который:
 
 ## Запуск
 
+### Предварительная подготовка
+
+Перед сборкой образа необходимо собрать бинарники:
+
+```bash
+# Из корня проекта
+goreleaser build --snapshot --clean
+```
+
+Убедитесь, что в папке `dist/` есть бинарники для нужных архитектур.
+
 ### Docker
+
 ```bash
 cd Dockerfiles/OllamaServer
 docker-compose up -d
 ```
 
 ### Podman
+
 ```bash
 cd Dockerfiles/OllamaServer
 podman-compose -f podman-compose.yml up -d
 ```
 
 ### Make
+
 ```bash
 cd Dockerfiles/OllamaServer
-make compose-up
-# или
+make build-all      # Собрать бинарники и Docker образ
+make compose-up     # Запустить через docker-compose
+
+# Или для Podman
+make build-all-podman
 make podman-compose-up
 ```
 
 ## Архитектура
 
 Контейнер запускает два сервиса:
+
 1. **Ollama** (порт 11434) - LLM сервер
 2. **LCG** (порт 8080) - Веб-интерфейс и API
 
 Оба сервиса работают в одном контейнере и общаются через localhost.
-

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +77,12 @@ func main() {
 		Usage:    config.AppConfig.AppName + " - Генерация Linux команд из описаний",
 		Version:  Version,
 		Commands: getCommands(),
+		Before: func(c *cli.Context) error {
+			// Применяем флаги приложения к конфигурации перед выполнением любой команды
+			// Это гарантирует, что флаги будут применены даже для команд, которые не используют основной Action
+			applyAppFlagsToConfig(c)
+			return nil
+		},
 		UsageText: `
 lcg [опции] <описание команды>
 
@@ -144,11 +151,24 @@ lcg [опции] <описание команды>
 				Aliases: []string{"f"},
 				Usage:   "Read part of the command from a file",
 			},
+			&cli.StringFlag{
+				Name:        "model",
+				Aliases:     []string{"M"},
+				DefaultText: "Use model from LCG_MODEL or default model",
+				Usage:       "Model to use",
+			},
 			&cli.BoolFlag{
 				Name:    "no-history",
 				Aliases: []string{"nh"},
 				Usage:   "Disable writing/updating command history (overrides LCG_NO_HISTORY)",
 				Value:   false,
+			},
+			&cli.StringFlag{
+				Name:        "query",
+				Aliases:     []string{"Q"},
+				Usage:       "Query to send to the model",
+				DefaultText: "Hello? what day is it today?",
+				Value:       "Hello? what day is it today?",
 			},
 			&cli.StringFlag{
 				Name:        "sys",
@@ -181,16 +201,25 @@ lcg [опции] <описание команды>
 		Action: func(c *cli.Context) error {
 			file := c.String("file")
 			system := c.String("sys")
+			model := c.String("model")
+			query := c.String("query")
 			// обновляем конфиг на основе флагов
-			if system != "" {
+			if c.IsSet("sys") && system != "" {
 				config.AppConfig.Prompt = system
+			}
+			if c.IsSet("query") && query != "" {
+				config.AppConfig.Query = query
 			}
 			if c.IsSet("timeout") {
 				config.AppConfig.Timeout = fmt.Sprintf("%d", c.Int("timeout"))
 			}
+			if c.IsSet("model") {
+				config.AppConfig.Model = model
+			}
+
 			promptID := c.Int("prompt-id")
 			timeout := c.Int("timeout")
-			// сохраняем конкретные значения флагов
+
 			config.AppConfig.MainFlags = config.MainFlags{
 				File:      file,
 				NoHistory: c.Bool("no-history"),
@@ -203,12 +232,9 @@ lcg [опции] <описание команды>
 
 			config.AppConfig.MainFlags.Debug = config.AppConfig.MainFlags.Debug || config.GetEnvBool("LCG_DEBUG", false)
 
-			// fmt.Println("Debug:", config.AppConfig.MainFlags.Debug)
-			// fmt.Println("LCG_DEBUG:", config.GetEnvBool("LCG_DEBUG", false))
-
 			args := c.Args().Slice()
 
-			if len(args) == 0 {
+			if len(args) == 0 && config.AppConfig.Query == "" {
 				cli.ShowAppHelp(c)
 				showTips()
 				return nil
@@ -231,6 +257,12 @@ lcg [опции] <описание команды>
 					os.Exit(1)
 				}
 			}
+
+			if config.AppConfig.Query != "" {
+				executeMain(file, system, config.AppConfig.Query, timeout)
+				return nil
+			}
+
 			executeMain(file, system, strings.Join(args, " "), timeout)
 			return nil
 		},
@@ -248,6 +280,31 @@ lcg [опции] <описание команды>
 	if err := app.Run(os.Args); err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
+	}
+}
+
+// applyAppFlagsToConfig применяет флаги приложения к конфигурации
+// Работает как для основного Action, так и для команд
+func applyAppFlagsToConfig(c *cli.Context) {
+	// Применяем флаг model - проверяем и через IsSet, и значение напрямую
+	// так как IsSet может не работать для флагов без значения по умолчанию
+	if model := c.String("model"); model != "" {
+		config.AppConfig.Model = model
+	}
+
+	// Применяем флаг sys
+	if sys := c.String("sys"); sys != "" {
+		config.AppConfig.Prompt = sys
+	}
+
+	// Применяем флаг timeout (только если явно установлен)
+	if c.IsSet("timeout") {
+		config.AppConfig.Timeout = fmt.Sprintf("%d", c.Int("timeout"))
+	}
+
+	// Применяем флаг query (игнорируем значение по умолчанию)
+	if query := c.String("query"); query != "" && query != "Hello? what day is it today?" {
+		config.AppConfig.Query = query
 	}
 }
 
@@ -390,6 +447,10 @@ func getCommands() []*cli.Command {
 				},
 			},
 			Action: func(c *cli.Context) error {
+				// Флаги приложения уже применены через глобальный Before hook
+				// Но применяем их еще раз на случай, если глобальный Before не сработал
+				applyAppFlagsToConfig(c)
+
 				if c.Bool("full") {
 					// Выводим полную конфигурацию в JSON формате
 					showFullConfig()
@@ -1027,12 +1088,7 @@ func getServerAllowHTTPForHost(host string) bool {
 // isSecureHost проверяет, является ли хост безопасным для HTTP
 func isSecureHost(host string) bool {
 	secureHosts := []string{"localhost", "127.0.0.1", "::1"}
-	for _, secureHost := range secureHosts {
-		if host == secureHost {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(secureHosts, host)
 }
 
 // showShortConfig показывает краткую конфигурацию

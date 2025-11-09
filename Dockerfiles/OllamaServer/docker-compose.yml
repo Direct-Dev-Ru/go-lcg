@@ -3,8 +3,9 @@ version: '3.8'
 services:
   lcg-ollama:
     build:
-      context: ../..
+      context: ../..  # Контекст сборки - корень проекта (для доступа к dist/)
       dockerfile: Dockerfiles/OllamaServer/Dockerfile
+      # TARGETARCH определяется автоматически Docker на основе платформы хоста
     container_name: lcg-ollama
     ports:
       - "8080:8080"  # LCG веб-сервер

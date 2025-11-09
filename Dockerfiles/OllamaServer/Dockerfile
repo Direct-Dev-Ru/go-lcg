@@ -1,74 +1,79 @@
-# Multi-stage build для LCG с Ollama
-FROM golang:1.24.6-alpine3.22 AS builder
+# Используем готовый образ Ollama
+FROM localhost/ollama_packed:latest
 
-WORKDIR /build
+# Устанавливаем bash если его нет (базовый образ ollama может быть на разных дистрибутивах)
+RUN if ! command -v bash >/dev/null 2>&1; then \
+        if command -v apk >/dev/null 2>&1; then \
+            apk add --no-cache bash; \
+        elif command -v apt-get >/dev/null 2>&1; then \
+            apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/*; \
+        fi; \
+    fi
 
-# Копируем файлы зависимостей
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Копируем исходный код
-COPY . .
-
-# Собираем бинарник
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s -buildid=" -trimpath -o /build/lcg .
-
-# Финальный образ с Ollama
-FROM alpine:3.22
-
-# Устанавливаем необходимые пакеты
-RUN apk add --no-cache \
-    curl \
-    ca-certificates \
-    bash \
-    && rm -rf /var/cache/apk/*
-
-# Устанавливаем Ollama 0.9.5 (поддержка разных архитектур)
+# Определяем архитектуру для копирования правильного бинарника
 ARG TARGETARCH
-RUN case ${TARGETARCH} in \
-    amd64) OLLAMA_ARCH=amd64 ;; \
-    arm64) OLLAMA_ARCH=arm64 ;; \
-    arm) OLLAMA_ARCH=arm64 ;; \
-    *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+ARG TARGETOS=linux
+
+# Копируем папку dist с бинарниками
+# Структура: dist/lcg_linux_amd64_v1/lcg_* или dist/lcg_linux_arm64_v8.0/lcg_*
+COPY dist/ /tmp/dist/
+
+# Выбираем правильный бинарник в зависимости от архитектуры
+# Если TARGETARCH не установлен, определяем архитектуру через uname
+RUN ARCH="${TARGETARCH:-$(uname -m)}" && \
+    case "${ARCH}" in \
+    amd64|x86_64) \
+        BIN_FILE=$(find /tmp/dist/lcg_linux_amd64_v* -name "lcg_*" -type f 2>/dev/null | head -1) && \
+        if [ -n "$BIN_FILE" ]; then \
+            cp "$BIN_FILE" /usr/local/bin/lcg && \
+            echo "Установлен бинарник для amd64: $BIN_FILE"; \
+        else \
+            echo "Бинарник для amd64 не найден в /tmp/dist/" && exit 1; \
+        fi ;; \
+    arm64|aarch64|arm) \
+        BIN_FILE=$(find /tmp/dist/lcg_linux_arm64_v* -name "lcg_*" -type f 2>/dev/null | head -1) && \
+        if [ -n "$BIN_FILE" ]; then \
+            cp "$BIN_FILE" /usr/local/bin/lcg && \
+            echo "Установлен бинарник для arm64: $BIN_FILE"; \
+        else \
+            echo "Бинарник для arm64 не найден в /tmp/dist/" && exit 1; \
+        fi ;; \
+    *) \
+        echo "Unsupported architecture: ${ARCH}" && \
+        echo "Доступные бинарники:" && \
+        find /tmp/dist -name "lcg_*" -type f 2>/dev/null && \
+        exit 1 ;; \
     esac && \
-    curl -L https://github.com/ollama/ollama/releases/download/v0.9.5/ollama-linux-${OLLAMA_ARCH} -o /usr/local/bin/ollama \
-    && chmod +x /usr/local/bin/ollama
-
-# Создаем пользователя для запуска сервисов
-RUN addgroup -g 1000 ollama && \
-    adduser -D -u 1000 -G ollama ollama && \
-    mkdir -p /home/ollama/.ollama && \
-    chown -R ollama:ollama /home/ollama
-
-# Копируем бинарник lcg
-COPY --from=builder /build/lcg /usr/local/bin/lcg
-RUN chmod +x /usr/local/bin/lcg
+    chmod +x /usr/local/bin/lcg && \
+    rm -rf /tmp/dist && \
+    (lcg --version || echo "Бинарник lcg установлен")
 
 # Копируем entrypoint скрипт
 COPY --chmod=755 Dockerfiles/OllamaServer/entrypoint.sh /entrypoint.sh
 
-# Создаем директории для данных
-RUN mkdir -p /app/data/results /app/data/prompts /app/data/config \
-    && chown -R ollama:ollama /app/data
+# Создаем директории для данных LCG
+# В базовом образе ollama уже есть пользователь ollama
+RUN mkdir -p /app/data/results /app/data/prompts /app/data/config
+
+# Устанавливаем права доступа (пользователь ollama должен существовать в базовом образе)
+RUN chown -R ollama:ollama /app/data 2>/dev/null || \
+    (chown -R 1000:1000 /app/data 2>/dev/null || true)
 
 # Настройки по умолчанию
 ENV LCG_PROVIDER=ollama
 ENV LCG_HOST=http://127.0.0.1:11434/
-ENV LCG_MODEL=codegeex4
+ENV LCG_MODEL=qwen2.5-coder:1.5b
 ENV LCG_RESULT_FOLDER=/app/data/results
 ENV LCG_PROMPT_FOLDER=/app/data/prompts
 ENV LCG_CONFIG_FOLDER=/app/data/config
 ENV LCG_SERVER_HOST=0.0.0.0
 ENV LCG_SERVER_PORT=8080
-ENV LCG_SERVER_ALLOW_HTTP=true
-ENV OLLAMA_HOST=0.0.0.0
-ENV OLLAMA_PORT=11434
+# ENV LCG_SERVER_ALLOW_HTTP=true
+# ENV OLLAMA_HOST=127.0.0.1
+# ENV OLLAMA_PORT=11434
 
 # Expose порты
-EXPOSE 8080 11434
-
-# Переключаемся на пользователя ollama
-USER ollama
+EXPOSE 8080
 
 WORKDIR /home/ollama
 
