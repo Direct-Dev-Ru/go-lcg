@@ -233,6 +233,9 @@ func handleExecuteRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Устанавливаем CSRF токен в cookie после обработки запроса
+	setCSRFCookie(w, csrfToken)
+
 	data := ExecutePageData{
 		Title:                "Результат выполнения",
 		Header:               "Результат выполнения",

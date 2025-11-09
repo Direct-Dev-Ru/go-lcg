@@ -64,7 +64,7 @@ export LCG_PROMPT_FOLDER="${LCG_PROMPT_FOLDER:-/app/data/prompts}"
 export LCG_CONFIG_FOLDER="${LCG_CONFIG_FOLDER:-/app/data/config}"
 export LCG_SERVER_HOST="${LCG_SERVER_HOST:-0.0.0.0}"
 export LCG_SERVER_PORT="${LCG_SERVER_PORT:-8080}"
-export LCG_SERVER_ALLOW_HTTP="${LCG_SERVER_ALLOW_HTTP:-true}"
+export LCG_SERVER_ALLOW_HTTP="${LCG_SERVER_ALLOW_HTTP:-false}"
 
 log "=========================================="
 log "Запуск LCG с Ollama сервером"
@@ -88,8 +88,7 @@ sleep 3
 
 # Проверяем, что LCG запущен
 if ! kill -0 $LCG_PID 2>/dev/null; then
-    error "LCG сервер не запустился"
-    kill $OLLAMA_PID 2>/dev/null || true
+    error "LCG сервер не запустился"    
     exit 1
 fi
 

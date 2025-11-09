@@ -72,6 +72,23 @@ run-podman: ## Запустить контейнер (Podman)
 		${IMAGE_NAME}:${IMAGE_TAG}
 	@echo "Контейнер ${CONTAINER_NAME} запущен"
 
+run-podman-nodemon: ## Запустить контейнер (Podman) без -d
+	echo "Запустить контейнер ${CONTAINER_NAME}"
+	echo "IMAGE_NAME: ${IMAGE_NAME}"
+	echo "IMAGE_TAG: ${IMAGE_TAG}"
+	echo "CONTAINER_NAME: ${CONTAINER_NAME}"
+
+	podman run \
+		--name ${CONTAINER_NAME} \
+		--restart always \
+		-p 8989:8080 \
+		-v ollama-data:/home/ollama/.ollama \
+		-v lcg-results:/app/data/results \
+		-v lcg-prompts:/app/data/prompts \
+		-v lcg-config:/app/data/config \
+		${IMAGE_NAME}:${IMAGE_TAG}
+	@echo "Контейнер ${CONTAINER_NAME} запущен"
+
 stop: ## Остановить контейнер (Docker)
 	docker stop $(CONTAINER_NAME) || true
 	docker rm $(CONTAINER_NAME) || true
