@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -60,7 +61,7 @@ func main() {
 		CompileConditions.NoServe = false
 	}
 
-	fmt.Println("Build conditions:", CompileConditions)
+	// fmt.Println("Build conditions:", CompileConditions)
 
 	_ = colorBlue
 
@@ -76,6 +77,12 @@ func main() {
 		Usage:    config.AppConfig.AppName + " - Генерация Linux команд из описаний",
 		Version:  Version,
 		Commands: getCommands(),
+		Before: func(c *cli.Context) error {
+			// Применяем флаги приложения к конфигурации перед выполнением любой команды
+			// Это гарантирует, что флаги будут применены даже для команд, которые не используют основной Action
+			applyAppFlagsToConfig(c)
+			return nil
+		},
 		UsageText: `
 lcg [опции] <описание команды>
 
@@ -87,12 +94,56 @@ lcg [опции] <описание команды>
 {{.AppName}} - инструмент для генерации Linux команд из описаний на естественном языке.
 Поддерживает чтение частей промпта из файлов и позволяет сохранять, копировать или перегенерировать результаты.
 может задавать системный промпт или выбирать из предустановленных промптов.
+
 Переменные окружения:
-  LCG_HOST          Endpoint для LLM API (по умолчанию: http://192.168.87.108:11434/)
-  LCG_MODEL         Название модели (по умолчанию: codegeex4)
-  LCG_PROMPT        Текст промпта по умолчанию
-  LCG_PROVIDER      Тип провайдера: "ollama" или "proxy" (по умолчанию: ollama)
-  LCG_JWT_TOKEN     JWT токен для proxy провайдера
+
+Основные настройки:
+  LCG_HOST                Endpoint для LLM API (по умолчанию: http://192.168.87.108:11434/)
+  LCG_MODEL               Название модели (по умолчанию: hf.co/yandex/YandexGPT-5-Lite-8B-instruct-GGUF:Q4_K_M)
+  LCG_PROMPT              Текст промпта по умолчанию
+  LCG_PROVIDER            Тип провайдера: "ollama" или "proxy" (по умолчанию: ollama)
+  LCG_JWT_TOKEN           JWT токен для proxy провайдера
+  LCG_PROMPT_ID           ID промпта по умолчанию (по умолчанию: 1)
+  LCG_TIMEOUT             Таймаут запроса в секундах (по умолчанию: 300)
+  LCG_COMPLETIONS_PATH    Путь к API для завершений (по умолчанию: api/chat)
+  LCG_PROXY_URL           URL прокси для proxy провайдера (по умолчанию: /api/v1/protected/sberchat/chat)
+  LCG_API_KEY_FILE        Файл с API ключом (по умолчанию: .openai_api_key)
+  LCG_APP_NAME            Название приложения (по умолчанию: Linux Command GPT)
+
+Настройки истории и выполнения:
+  LCG_NO_HISTORY          Отключить запись истории ("1" или "true" = отключено, пусто = включено)
+  LCG_ALLOW_EXECUTION     Разрешить выполнение команд ("1" или "true" = разрешено, пусто = запрещено)
+  LCG_RESULT_FOLDER       Папка для сохранения результатов (по умолчанию: ~/.config/lcg/gpt_results)
+  LCG_RESULT_HISTORY      Файл истории результатов (по умолчанию: <result_folder>/lcg_history.json)
+  LCG_PROMPT_FOLDER       Папка для системных промптов (по умолчанию: ~/.config/lcg/gpt_sys_prompts)
+  LCG_CONFIG_FOLDER       Папка для конфигурации (по умолчанию: ~/.config/lcg/config)
+
+Настройки сервера (команда serve):
+  LCG_SERVER_PORT         Порт сервера (по умолчанию: 8080)
+  LCG_SERVER_HOST         Хост сервера (по умолчанию: localhost)
+  LCG_SERVER_ALLOW_HTTP   Разрешить HTTP соединения ("true" для localhost, "false" для других хостов)
+  LCG_SERVER_REQUIRE_AUTH Требовать аутентификацию ("1" или "true" = требуется, пусто = не требуется)
+  LCG_SERVER_PASSWORD     Пароль администратора (по умолчанию: admin#123456)
+  LCG_SERVER_SSL_CERT_FILE Путь к SSL сертификату
+  LCG_SERVER_SSL_KEY_FILE  Путь к приватному ключу SSL
+  LCG_DOMAIN              Домен для сервера (по умолчанию: значение LCG_SERVER_HOST)
+  LCG_COOKIE_SECURE       Безопасные cookie ("1" или "true" = включено, пусто = выключено)
+  LCG_COOKIE_PATH         Путь для cookie (по умолчанию: /lcg)
+  LCG_COOKIE_TTL_HOURS    Время жизни cookie в часах (по умолчанию: 168)
+  LCG_BASE_URL            Базовый URL приложения (по умолчанию: /lcg)
+  LCG_HEALTH_URL          URL для проверки здоровья API (по умолчанию: /api/v1/protected/sberchat/health)
+
+Настройки валидации:
+  LCG_MAX_SYSTEM_PROMPT_LENGTH    Максимальная длина системного промпта (по умолчанию: 2000)
+  LCG_MAX_USER_MESSAGE_LENGTH     Максимальная длина пользовательского сообщения (по умолчанию: 4000)
+  LCG_MAX_PROMPT_NAME_LENGTH      Максимальная длина названия промпта (по умолчанию: 2000)
+  LCG_MAX_PROMPT_DESC_LENGTH      Максимальная длина описания промпта (по умолчанию: 5000)
+  LCG_MAX_COMMAND_LENGTH          Максимальная длина команды (по умолчанию: 8000)
+  LCG_MAX_EXPLANATION_LENGTH      Максимальная длина объяснения (по умолчанию: 20000)
+
+Отладка и браузер:
+  LCG_DEBUG               Включить режим отладки ("1" или "true" = включено, пусто = выключено)
+  LCG_BROWSER_PATH        Путь к браузеру для автоматического открытия (команда serve --browser)
 `,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -100,11 +151,24 @@ lcg [опции] <описание команды>
 				Aliases: []string{"f"},
 				Usage:   "Read part of the command from a file",
 			},
+			&cli.StringFlag{
+				Name:        "model",
+				Aliases:     []string{"M"},
+				DefaultText: "Use model from LCG_MODEL or default model",
+				Usage:       "Model to use",
+			},
 			&cli.BoolFlag{
 				Name:    "no-history",
 				Aliases: []string{"nh"},
 				Usage:   "Disable writing/updating command history (overrides LCG_NO_HISTORY)",
 				Value:   false,
+			},
+			&cli.StringFlag{
+				Name:        "query",
+				Aliases:     []string{"Q"},
+				Usage:       "Query to send to the model",
+				DefaultText: "Hello? what day is it today?",
+				Value:       "Hello? what day is it today?",
 			},
 			&cli.StringFlag{
 				Name:        "sys",
@@ -137,16 +201,25 @@ lcg [опции] <описание команды>
 		Action: func(c *cli.Context) error {
 			file := c.String("file")
 			system := c.String("sys")
+			model := c.String("model")
+			query := c.String("query")
 			// обновляем конфиг на основе флагов
-			if system != "" {
+			if c.IsSet("sys") && system != "" {
 				config.AppConfig.Prompt = system
+			}
+			if c.IsSet("query") && query != "" {
+				config.AppConfig.Query = query
 			}
 			if c.IsSet("timeout") {
 				config.AppConfig.Timeout = fmt.Sprintf("%d", c.Int("timeout"))
 			}
+			if c.IsSet("model") {
+				config.AppConfig.Model = model
+			}
+
 			promptID := c.Int("prompt-id")
 			timeout := c.Int("timeout")
-			// сохраняем конкретные значения флагов
+
 			config.AppConfig.MainFlags = config.MainFlags{
 				File:      file,
 				NoHistory: c.Bool("no-history"),
@@ -159,12 +232,9 @@ lcg [опции] <описание команды>
 
 			config.AppConfig.MainFlags.Debug = config.AppConfig.MainFlags.Debug || config.GetEnvBool("LCG_DEBUG", false)
 
-			fmt.Println("Debug:", config.AppConfig.MainFlags.Debug)
-			fmt.Println("LCG_DEBUG:", config.GetEnvBool("LCG_DEBUG", false))
-
 			args := c.Args().Slice()
 
-			if len(args) == 0 {
+			if len(args) == 0 && config.AppConfig.Query == "" {
 				cli.ShowAppHelp(c)
 				showTips()
 				return nil
@@ -187,6 +257,12 @@ lcg [опции] <описание команды>
 					os.Exit(1)
 				}
 			}
+
+			if config.AppConfig.Query != "" {
+				executeMain(file, system, config.AppConfig.Query, timeout)
+				return nil
+			}
+
 			executeMain(file, system, strings.Join(args, " "), timeout)
 			return nil
 		},
@@ -204,6 +280,31 @@ lcg [опции] <описание команды>
 	if err := app.Run(os.Args); err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
+	}
+}
+
+// applyAppFlagsToConfig применяет флаги приложения к конфигурации
+// Работает как для основного Action, так и для команд
+func applyAppFlagsToConfig(c *cli.Context) {
+	// Применяем флаг model - проверяем и через IsSet, и значение напрямую
+	// так как IsSet может не работать для флагов без значения по умолчанию
+	if model := c.String("model"); model != "" {
+		config.AppConfig.Model = model
+	}
+
+	// Применяем флаг sys
+	if sys := c.String("sys"); sys != "" {
+		config.AppConfig.Prompt = sys
+	}
+
+	// Применяем флаг timeout (только если явно установлен)
+	if c.IsSet("timeout") {
+		config.AppConfig.Timeout = fmt.Sprintf("%d", c.Int("timeout"))
+	}
+
+	// Применяем флаг query (игнорируем значение по умолчанию)
+	if query := c.String("query"); query != "" && query != "Hello? what day is it today?" {
+		config.AppConfig.Query = query
 	}
 }
 
@@ -346,6 +447,10 @@ func getCommands() []*cli.Command {
 				},
 			},
 			Action: func(c *cli.Context) error {
+				// Флаги приложения уже применены через глобальный Before hook
+				// Но применяем их еще раз на случай, если глобальный Before не сработал
+				applyAppFlagsToConfig(c)
+
 				if c.Bool("full") {
 					// Выводим полную конфигурацию в JSON формате
 					showFullConfig()
@@ -983,12 +1088,7 @@ func getServerAllowHTTPForHost(host string) bool {
 // isSecureHost проверяет, является ли хост безопасным для HTTP
 func isSecureHost(host string) bool {
 	secureHosts := []string{"localhost", "127.0.0.1", "::1"}
-	for _, secureHost := range secureHosts {
-		if host == secureHost {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(secureHosts, host)
 }
 
 // showShortConfig показывает краткую конфигурацию

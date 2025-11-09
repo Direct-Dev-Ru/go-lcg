@@ -35,10 +35,17 @@ Explanations:
 
 Clipboard support requires `xclip` or `xsel`.
 
-## What's new in 2.0.1
+## What's new in 2.0.14
 
-- Mobile UI improvements: better responsiveness (buttons, fonts, spacing) and reduced motion support
-- Public REST endpoint: `POST /execute` (curl-only) for programmatic access — see `API_GUIDE.md`
+- Authentication: JWT-based authentication with HTTP-only cookies
+- CSRF protection: Full CSRF protection with tokens and middleware
+- Security: Enhanced security with token validation and sessions
+- Kubernetes deployment: Full set of manifests for Kubernetes deployment with Traefik
+- Reverse Proxy: Support for working behind reverse proxy with cookie configuration
+- Web interface: Improved web interface with modern design
+- Monitoring: Prometheus metrics and ServiceMonitor
+- Scaling: HPA for automatic scaling
+- Testing: CSRF protection testing tools
 
 ## Environment
 
@@ -133,10 +140,15 @@ The `serve` command provides both a web interface and REST API:
 
 **Web Interface:**
 
-- Browse results at `http://localhost:8080/`
-- Execute requests at `http://localhost:8080/run`
-- Manage prompts at `http://localhost:8080/prompts`
-- View history at `http://localhost:8080/history`
+- Browse results at `http://localhost:8080/` (or `http://localhost:8080<BASE_PATH>/` if `LCG_BASE_URL` set)
+- Execute requests at `.../run`
+- Manage prompts at `.../prompts`
+- View history at `.../history`
+
+Notes:
+- Base path: set `LCG_BASE_URL` (e.g. `/lcg`) to prefix all routes and API.
+- Custom 404: unknown paths under base path render a modern 404 page.
+- Debug: enable via flag `--debug` or env `LCG_DEBUG=1|true`.
 
 **REST API:**
 

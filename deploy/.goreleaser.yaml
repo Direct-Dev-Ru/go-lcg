@@ -6,6 +6,8 @@ builds:
     binary: "lcg_{{ .Version }}"
     goos:
       - linux
+      - windows
+      - darwin
     goarch:
       - amd64
       - arm64
@@ -21,9 +23,10 @@ builds:
 
 archives:
   - id: lcg
-    builds:
+    ids:
       - lcg
-    format: binary
+    formats:
+      - binary
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
     files:
       - "lcg_{{ .Version }}"

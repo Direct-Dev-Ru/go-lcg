@@ -22,7 +22,7 @@ sudo apt-get install xsel
 
 ```bash
 
-git clone --depth 1 https://github.com/Direct-Dev-Ru/go-lcg.git ~/.linux-command-gpt
+git clone --depth 1 https://github.com/Direct-Dev-Ru/linux-command-gpt.git ~/.linux-command-gpt
 cd ~/.linux-command-gpt
 go build -o lcg
 
@@ -60,7 +60,7 @@ lcg --file /path/to/context.txt "хочу вывести список дирек
 Действия: (c)копировать, (s)сохранить, (r)перегенерировать, (e)выполнить, (v|vv|vvv)подробно, (n)ничего:
 ```
 
-### Что нового в 3.0.0
+### Что нового в 2.0.14
 
 - **Аутентификация**: Добавлена система аутентификации с JWT токенами и HTTP-only cookies
 - **CSRF защита**: Полная защита от CSRF атак с токенами и middleware

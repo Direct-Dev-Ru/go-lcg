@@ -232,11 +232,11 @@ func registerRoutesExceptHome() {
 	http.HandleFunc(makePath("/api/add-to-history"), AuthMiddleware(CSRFMiddleware(handleAddToHistory)))
 
 	// Catch-all 404 для любых незарегистрированных путей (только когда BasePath задан)
-	if getBasePath() != "" {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			renderNotFound(w, "Страница не найдена", getBasePath())
-		})
-	}
+	// if getBasePath() != "" {
+	// 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// 		renderNotFound(w, "Страница не найдена", getBasePath())
+	// 	})
+	// }
 }
 
 // registerRoutes регистрирует все маршруты сервера

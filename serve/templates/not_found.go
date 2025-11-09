@@ -53,6 +53,16 @@ const NotFoundTemplate = `
       backdrop-filter: blur(10px);
       text-align: center;
     }
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        text-shadow: 0 8px 40px var(--accentGlow);
+      }
+      50% {
+        transform: scale(1.15);
+        text-shadow: 0 12px 60px var(--accentGlow), 0 0 30px var(--accentGlow2);
+      }
+    }
     .code {
       font-size: clamp(48px, 12vw, 120px);
       line-height: 0.9;
@@ -64,6 +74,8 @@ const NotFoundTemplate = `
       color: transparent;
       margin: 8px 0 12px 0;
       text-shadow: 0 8px 40px var(--accentGlow);
+      animation: pulse 2.5s ease-in-out infinite;
+      transform-origin: center;
     }
     .title {
       font-size: clamp(18px, 3.2vw, 28px);
@@ -133,7 +145,7 @@ const NotFoundTemplate = `
   <div class="card">
     <div class="code">404</div>
     <div class="title">Страница не найдена</div>
-    <p class="desc">{{.Message}}</p>
+    <p class="desc">Такой страницы не существует. Вы можете вернуться на главную страницу или выполнить команду.</p>
     <div class="btns">
       <a class="btn" href="{{.BasePath}}/">🏠 На главную</a>
       <a class="btn secondary" href="{{.BasePath}}/run">🚀 К выполнению</a>
@@ -143,5 +155,3 @@ const NotFoundTemplate = `
 </body>
 </html>
 `
-
-

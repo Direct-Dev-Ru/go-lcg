@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+lcg
+go-lcg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+*_test.go
+test_*.sh
+
+# Deployment scripts
+deploy/
+shell-code/
+kustomize/
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
