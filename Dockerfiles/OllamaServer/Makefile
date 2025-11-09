@@ -46,27 +46,31 @@ build-all-podman: build-binaries build-podman ## Собрать бинарник
 
 run: ## Запустить контейнер (Docker)
 	docker run -d \
-		--name $(CONTAINER_NAME) \
-		-p 8080:8080 \
-		-p 11434:11434 \
+		--name ${CONTAINER_NAME} \
+		-p 8989:8080 \		
 		-v ollama-data:/home/ollama/.ollama \
 		-v lcg-results:/app/data/results \
 		-v lcg-prompts:/app/data/prompts \
 		-v lcg-config:/app/data/config \
-		$(IMAGE_NAME):$(IMAGE_TAG)
-	@echo "Контейнер $(CONTAINER_NAME) запущен"
+		${IMAGE_NAME}:${IMAGE_TAG}
+	@echo "Контейнер ${CONTAINER_NAME} запущен"
 
 run-podman: ## Запустить контейнер (Podman)
+	echo "Запустить контейнер ${CONTAINER_NAME}"
+	echo "IMAGE_NAME: ${IMAGE_NAME}"
+	echo "IMAGE_TAG: ${IMAGE_TAG}"
+	echo "CONTAINER_NAME: ${CONTAINER_NAME}"
+
 	podman run -d \
-		--name $(CONTAINER_NAME) \
-		-p 8080:8080 \
-		-p 11434:11434 \
+		--name ${CONTAINER_NAME} \
+		--restart always \
+		-p 8989:8080 \
 		-v ollama-data:/home/ollama/.ollama \
 		-v lcg-results:/app/data/results \
 		-v lcg-prompts:/app/data/prompts \
 		-v lcg-config:/app/data/config \
-		$(IMAGE_NAME):$(IMAGE_TAG)
-	@echo "Контейнер $(CONTAINER_NAME) запущен"
+		${IMAGE_NAME}:${IMAGE_TAG}
+	@echo "Контейнер ${CONTAINER_NAME} запущен"
 
 stop: ## Остановить контейнер (Docker)
 	docker stop $(CONTAINER_NAME) || true
