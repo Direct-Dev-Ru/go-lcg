@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -45,25 +46,70 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 // CSRFMiddleware проверяет CSRF токены для POST/PUT/DELETE запросов
 func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("\n[CSRF MIDDLEWARE] ==========================================\n")
+		fmt.Printf("[CSRF MIDDLEWARE] Обработка запроса: %s %s\n", r.Method, r.URL.Path)
+		fmt.Printf("[CSRF MIDDLEWARE] RemoteAddr: %s\n", r.RemoteAddr)
+		fmt.Printf("[CSRF MIDDLEWARE] Host: %s\n", r.Host)
+
+		// Выводим все заголовки
+		fmt.Printf("[CSRF MIDDLEWARE] Заголовки:\n")
+		for name, values := range r.Header {
+			if name == "Cookie" {
+				// Cookie выводим отдельно, разбирая их
+				fmt.Printf("[CSRF MIDDLEWARE]   %s: %s\n", name, strings.Join(values, "; "))
+			} else {
+				fmt.Printf("[CSRF MIDDLEWARE]   %s: %s\n", name, strings.Join(values, ", "))
+			}
+		}
+
+		// Выводим все cookies
+		fmt.Printf("[CSRF MIDDLEWARE] Все cookies:\n")
+		if len(r.Cookies()) == 0 {
+			fmt.Printf("[CSRF MIDDLEWARE]   (нет cookies)\n")
+		} else {
+			for _, cookie := range r.Cookies() {
+				fmt.Printf("[CSRF MIDDLEWARE]   %s = %s (Path: %s, Domain: %s, Secure: %t, HttpOnly: %t, SameSite: %v, MaxAge: %d)\n",
+					cookie.Name,
+					safeSubstring(cookie.Value, 0, 50),
+					cookie.Path,
+					cookie.Domain,
+					cookie.Secure,
+					cookie.HttpOnly,
+					cookie.SameSite,
+					cookie.MaxAge)
+			}
+		}
+
 		// Проверяем только изменяющие запросы
 		if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" {
+			fmt.Printf("[CSRF MIDDLEWARE] Пропускаем проверку CSRF для метода %s\n", r.Method)
 			next(w, r)
 			return
 		}
 
 		// Исключаем некоторые API endpoints (с учетом BasePath)
 		if r.URL.Path == makePath("/api/login") || r.URL.Path == makePath("/api/logout") {
+			fmt.Printf("[CSRF MIDDLEWARE] Пропускаем проверку CSRF для пути %s\n", r.URL.Path)
 			next(w, r)
 			return
 		}
 
 		// Получаем CSRF токен из заголовка или формы
-		csrfToken := r.Header.Get("X-CSRF-Token")
+		csrfTokenFromHeader := r.Header.Get("X-CSRF-Token")
+		csrfTokenFromForm := r.FormValue("csrf_token")
+
+		fmt.Printf("[CSRF MIDDLEWARE] CSRF токен из заголовка X-CSRF-Token: %s\n",
+			safeSubstring(csrfTokenFromHeader, 0, 50))
+		fmt.Printf("[CSRF MIDDLEWARE] CSRF токен из формы csrf_token: %s\n",
+			safeSubstring(csrfTokenFromForm, 0, 50))
+
+		csrfToken := csrfTokenFromHeader
 		if csrfToken == "" {
-			csrfToken = r.FormValue("csrf_token")
+			csrfToken = csrfTokenFromForm
 		}
 
 		if csrfToken == "" {
+			fmt.Printf("[CSRF MIDDLEWARE] ❌ ОШИБКА: CSRF токен не найден ни в заголовке, ни в форме!\n")
 			// Для API запросов возвращаем JSON ошибку
 			if isAPIRequest(r) {
 				w.Header().Set("Content-Type", "application/json")
@@ -77,12 +123,47 @@ func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		fmt.Printf("[CSRF MIDDLEWARE] Используемый CSRF токен (первые 50 символов): %s...\n",
+			safeSubstring(csrfToken, 0, 50))
+
 		// Получаем сессионный ID
 		sessionID := getSessionID(r)
+		fmt.Printf("[CSRF MIDDLEWARE] SessionID: %s\n", sessionID)
+
+		// Получаем CSRF токен из cookie для сравнения
+		csrfTokenFromCookie := GetCSRFTokenFromCookie(r)
+		if csrfTokenFromCookie != "" {
+			fmt.Printf("[CSRF MIDDLEWARE] CSRF токен из cookie (первые 50 символов): %s...\n",
+				safeSubstring(csrfTokenFromCookie, 0, 50))
+			if csrfTokenFromCookie != csrfToken {
+				fmt.Printf("[CSRF MIDDLEWARE] ⚠️  ВНИМАНИЕ: Токен из cookie отличается от токена в запросе!\n")
+			} else {
+				fmt.Printf("[CSRF MIDDLEWARE] ✅ Токен из cookie совпадает с токеном в запросе\n")
+			}
+		} else {
+			fmt.Printf("[CSRF MIDDLEWARE] ⚠️  ВНИМАНИЕ: CSRF токен не найден в cookie!\n")
+		}
 
 		// Проверяем CSRF токен
 		csrfManager := GetCSRFManager()
-		if csrfManager == nil || !csrfManager.ValidateToken(csrfToken, sessionID) {
+		if csrfManager == nil {
+			fmt.Printf("[CSRF MIDDLEWARE] ❌ ОШИБКА: CSRF менеджер не инициализирован!\n")
+			if isAPIRequest(r) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"success": false, "error": "Invalid CSRF token"}`))
+				return
+			}
+			http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+			return
+		}
+
+		fmt.Printf("[CSRF MIDDLEWARE] Вызов ValidateToken с токеном и sessionID: %s\n", sessionID)
+		valid := csrfManager.ValidateToken(csrfToken, sessionID)
+		fmt.Printf("[CSRF MIDDLEWARE] Результат ValidateToken: %t\n", valid)
+
+		if !valid {
+			fmt.Printf("[CSRF MIDDLEWARE] ❌ ОШИБКА: Валидация CSRF токена не прошла!\n")
 			// Для API запросов возвращаем JSON ошибку
 			if isAPIRequest(r) {
 				w.Header().Set("Content-Type", "application/json")
@@ -96,6 +177,8 @@ func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		fmt.Printf("[CSRF MIDDLEWARE] ✅ CSRF токен валиден, продолжаем обработку запроса\n")
+		fmt.Printf("[CSRF MIDDLEWARE] ==========================================\n\n")
 		// CSRF токен валиден, продолжаем
 		next(w, r)
 	}

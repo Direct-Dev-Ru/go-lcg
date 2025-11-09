@@ -75,6 +75,8 @@ func getCSRFSecretKey() ([]byte, error) {
 
 // GenerateToken генерирует CSRF токен для пользователя
 func (c *CSRFManager) GenerateToken(userID string) (string, error) {
+	fmt.Printf("[CSRF DEBUG] Генерация нового токена для UserID: %s\n", userID)
+
 	// Создаем данные токена
 	data := CSRFData{
 		Token:     generateRandomString(32),
@@ -82,54 +84,85 @@ func (c *CSRFManager) GenerateToken(userID string) (string, error) {
 		UserID:    userID,
 	}
 
+	fmt.Printf("[CSRF DEBUG] Созданные данные токена: Token (первые 20 символов): %s..., Timestamp: %d, UserID: %s\n",
+		safeSubstring(data.Token, 0, 20), data.Timestamp, data.UserID)
+
 	// Создаем подпись
 	signature := c.createSignature(data)
+	fmt.Printf("[CSRF DEBUG] Созданная подпись (первые 20 символов): %s...\n", safeSubstring(signature, 0, 20))
 
 	// Кодируем данные в base64
 	encodedData := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%d:%s", data.Token, data.Timestamp, data.UserID)))
+	fmt.Printf("[CSRF DEBUG] Закодированные данные (первые 30 символов): %s...\n", safeSubstring(encodedData, 0, 30))
 
-	return fmt.Sprintf("%s.%s", encodedData, signature), nil
+	token := fmt.Sprintf("%s.%s", encodedData, signature)
+	fmt.Printf("[CSRF DEBUG] Итоговый токен сгенерирован (первые 50 символов): %s...\n", safeSubstring(token, 0, 50))
+
+	return token, nil
 }
 
 // ValidateToken проверяет CSRF токен
 func (c *CSRFManager) ValidateToken(token, userID string) bool {
+	fmt.Printf("[CSRF DEBUG] Начало валидации токена. UserID из запроса: %s\n", userID)
+	fmt.Printf("[CSRF DEBUG] Токен (первые 50 символов): %s...\n", safeSubstring(token, 0, 50))
+
 	// Разделяем токен на данные и подпись
 	parts := splitToken(token)
 	if len(parts) != 2 {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: Токен не может быть разделен на 2 части. Получено частей: %d\n", len(parts))
 		return false
 	}
 
 	encodedData, signature := parts[0], parts[1]
+	fmt.Printf("[CSRF DEBUG] Токен разделен на encodedData (первые 30 символов): %s... и signature (первые 20 символов): %s...\n",
+		safeSubstring(encodedData, 0, 30), safeSubstring(signature, 0, 20))
 
 	// Декодируем данные
 	dataBytes, err := base64.StdEncoding.DecodeString(encodedData)
 	if err != nil {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: Не удалось декодировать base64 данные: %v\n", err)
 		return false
 	}
+
+	fmt.Printf("[CSRF DEBUG] Данные декодированы. Длина: %d байт\n", len(dataBytes))
 
 	// Парсим данные
 	dataParts := splitString(string(dataBytes), ":")
 	if len(dataParts) != 3 {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: Данные не могут быть разделены на 3 части. Получено частей: %d. Данные: %s\n", len(dataParts), string(dataBytes))
 		return false
 	}
 
 	tokenValue, timestampStr, tokenUserID := dataParts[0], dataParts[1], dataParts[2]
+	fmt.Printf("[CSRF DEBUG] Распарсены данные: tokenValue (первые 20 символов): %s..., timestamp: %s, tokenUserID: %s\n",
+		safeSubstring(tokenValue, 0, 20), timestampStr, tokenUserID)
 
 	// Проверяем пользователя
 	if tokenUserID != userID {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: UserID не совпадает! Ожидался: '%s', получен из токена: '%s'\n", userID, tokenUserID)
 		return false
 	}
+	fmt.Printf("[CSRF DEBUG] ✅ UserID совпадает: %s\n", userID)
 
 	// Проверяем время жизни токена (минимум 12 часов)
 	timestamp, err := parseInt64(timestampStr)
 	if err != nil {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: Не удалось распарсить timestamp '%s': %v\n", timestampStr, err)
 		return false
 	}
 
+	now := time.Now().Unix()
+	age := now - timestamp
+	ageHours := float64(age) / 3600.0
+	fmt.Printf("[CSRF DEBUG] Текущее время: %d, timestamp токена: %d, возраст токена: %d сек (%.2f часов)\n", now, timestamp, age, ageHours)
+
 	// Минимальное время жизни токена: 12 часов (не менее 12 часов согласно требованиям)
-	if time.Now().Unix()-timestamp > CSRFTokenLifetimeSeconds {
+	if age > CSRFTokenLifetimeSeconds {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: Токен устарел! Возраст: %d сек (%.2f часов), максимум: %d сек (%.2f часов)\n",
+			age, ageHours, CSRFTokenLifetimeSeconds, float64(CSRFTokenLifetimeSeconds)/3600.0)
 		return false
 	}
+	fmt.Printf("[CSRF DEBUG] ✅ Токен не устарел (возраст в пределах лимита)\n")
 
 	// Создаем данные для проверки подписи
 	data := CSRFData{
@@ -140,7 +173,30 @@ func (c *CSRFManager) ValidateToken(token, userID string) bool {
 
 	// Проверяем подпись
 	expectedSignature := c.createSignature(data)
-	return signature == expectedSignature
+	signatureMatch := signature == expectedSignature
+	if !signatureMatch {
+		fmt.Printf("[CSRF DEBUG] ❌ ОШИБКА: Подпись не совпадает!\n")
+		fmt.Printf("[CSRF DEBUG] Ожидаемая подпись (первые 20 символов): %s...\n", safeSubstring(expectedSignature, 0, 20))
+		fmt.Printf("[CSRF DEBUG] Полученная подпись (первые 20 символов): %s...\n", safeSubstring(signature, 0, 20))
+		fmt.Printf("[CSRF DEBUG] Данные для подписи: Token=%s (первые 20), Timestamp=%d, UserID=%s\n",
+			safeSubstring(tokenValue, 0, 20), timestamp, tokenUserID)
+	} else {
+		fmt.Printf("[CSRF DEBUG] ✅ Подпись совпадает\n")
+	}
+	fmt.Printf("[CSRF DEBUG] Результат валидации: %t\n", signatureMatch)
+	return signatureMatch
+}
+
+// safeSubstring безопасно обрезает строку
+func safeSubstring(s string, start, length int) string {
+	if start >= len(s) {
+		return ""
+	}
+	end := start + length
+	if end > len(s) {
+		end = len(s)
+	}
+	return s[start:end]
 }
 
 // createSignature создает подпись для данных
@@ -161,6 +217,13 @@ func GetCSRFTokenFromCookie(r *http.Request) string {
 
 // setCSRFCookie устанавливает CSRF токен в cookie
 func setCSRFCookie(w http.ResponseWriter, token string) {
+	fmt.Printf("[CSRF DEBUG] Установка CSRF cookie. Токен (первые 50 символов): %s...\n", safeSubstring(token, 0, 50))
+	fmt.Printf("[CSRF DEBUG] Cookie настройки: Path=%s, Secure=%t, Domain=%s, MaxAge=%d сек\n",
+		config.AppConfig.Server.CookiePath,
+		config.AppConfig.Server.CookieSecure,
+		config.AppConfig.Server.Domain,
+		CSRFTokenLifetimeSeconds)
+
 	// Минимальное время жизни токена: 12 часов (не менее 12 часов согласно требованиям)
 	cookie := &http.Cookie{
 		Name:     "csrf_token",
@@ -175,9 +238,14 @@ func setCSRFCookie(w http.ResponseWriter, token string) {
 	// Добавляем домен если указан
 	if config.AppConfig.Server.Domain != "" {
 		cookie.Domain = config.AppConfig.Server.Domain
+		fmt.Printf("[CSRF DEBUG] Cookie Domain установлен: %s\n", cookie.Domain)
+	} else {
+		fmt.Printf("[CSRF DEBUG] Cookie Domain не установлен (пустой)\n")
 	}
 
 	http.SetCookie(w, cookie)
+	fmt.Printf("[CSRF DEBUG] ✅ CSRF cookie установлен: Name=%s, Path=%s, Domain=%s, Secure=%t, HttpOnly=%t, SameSite=%v, MaxAge=%d\n",
+		cookie.Name, cookie.Path, cookie.Domain, cookie.Secure, cookie.HttpOnly, cookie.SameSite, cookie.MaxAge)
 }
 
 // clearCSRFCookie удаляет CSRF cookie
