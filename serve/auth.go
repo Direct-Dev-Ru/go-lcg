@@ -127,7 +127,6 @@ func getTokenFromCookie(r *http.Request) (string, error) {
 func setAuthCookie(w http.ResponseWriter, token string) {
 	cookie := &http.Cookie{
 		Name:     "auth_token",
-		Domain:   config.AppConfig.Server.Domain,
 		Value:    token,
 		Path:     config.AppConfig.Server.CookiePath,
 		HttpOnly: true,
@@ -136,9 +135,16 @@ func setAuthCookie(w http.ResponseWriter, token string) {
 		MaxAge:   config.AppConfig.Server.CookieTTLHours * 60 * 60,
 	}
 
-	// Добавляем домен если указан
+	// Устанавливаем Domain только если это не IP адрес и не 0.0.0.0
+	// При доступе по IP адресу не устанавливаем Domain, иначе cookie не будет работать
 	if config.AppConfig.Server.Domain != "" {
-		cookie.Domain = config.AppConfig.Server.Domain
+		domain := config.AppConfig.Server.Domain
+		// Проверяем, не является ли домен IP адресом или 0.0.0.0
+		if !isIPAddress(domain) && domain != "0.0.0.0" && domain != "::" && domain != "::1" {
+			cookie.Domain = domain
+		}
+		// Если domain пустой, 0.0.0.0 или IP адрес - не устанавливаем Domain
+		// Браузер автоматически применит cookie к текущему хосту
 	}
 
 	http.SetCookie(w, cookie)
@@ -156,9 +162,12 @@ func clearAuthCookie(w http.ResponseWriter) {
 		MaxAge:   -1, // Удаляем cookie
 	}
 
-	// Добавляем домен если указан
+	// Устанавливаем Domain только если это не IP адрес
 	if config.AppConfig.Server.Domain != "" {
-		cookie.Domain = config.AppConfig.Server.Domain
+		domain := config.AppConfig.Server.Domain
+		if !isIPAddress(domain) && domain != "0.0.0.0" && domain != "::" && domain != "::1" {
+			cookie.Domain = domain
+		}
 	}
 
 	http.SetCookie(w, cookie)

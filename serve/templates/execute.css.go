@@ -72,8 +72,9 @@ var ExecutePageCSSTemplate = template.Must(template.New("execute_css").Parse(`
             text-align: center;
         }
         .header h1 {
+            margin: 0;
             font-size: 2.5em;
-            margin-bottom: 10px;
+            font-weight: 300;
         }
         .header p {
             opacity: 0.9;

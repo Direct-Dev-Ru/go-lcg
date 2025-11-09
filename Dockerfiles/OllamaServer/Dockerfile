@@ -60,6 +60,8 @@ RUN chown -R ollama:ollama /app/data 2>/dev/null || \
     (chown -R 1000:1000 /app/data 2>/dev/null || true)
 
 # Настройки по умолчанию
+ENV TZ='Asia/Omsk'
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ENV LCG_PROVIDER=ollama
 ENV LCG_HOST=http://127.0.0.1:11434/
 ENV LCG_MODEL=qwen2.5-coder:1.5b
