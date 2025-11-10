@@ -200,11 +200,25 @@ func (p *ProxyAPIProvider) Health() error {
 
 // Chat для OllamaProvider
 func (o *OllamaProvider) Chat(messages []Chat) (string, error) {
-	payload := Gpt3Request{
+
+	think := config.AppConfig.Think
+	
+	var payload interface{}
+	if think {
+	payload = Gpt3Request{
 		Model:    o.Model,
 		Messages: messages,
-		Stream:   false,
+		Stream:   false,		
 		Options:  Gpt3Options{o.Temperature},
+	}
+	} else {
+		payload = Gpt3ThinkRequest{
+			Model:    o.Model,
+			Messages: messages,
+			Stream:   false,
+			Think:    false,
+			Options:  Gpt3Options{o.Temperature},
+		}
 	}
 
 	jsonData, err := json.Marshal(payload)

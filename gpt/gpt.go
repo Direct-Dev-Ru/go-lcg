@@ -44,8 +44,16 @@ type Chat struct {
 
 type Gpt3Request struct {
 	Model    string      `json:"model"`
-	Stream   bool        `json:"stream"`
+	Stream   bool        `json:"stream"`	
 	Messages []Chat      `json:"messages"`
+	Options  Gpt3Options `json:"options"`
+}
+
+type Gpt3ThinkRequest struct {
+	Model  string `json:"model"`
+	Stream bool   `json:"stream"`
+	Think  bool   `json:"think"`
+	Messages []Chat `json:"messages"`
 	Options  Gpt3Options `json:"options"`
 }
 
