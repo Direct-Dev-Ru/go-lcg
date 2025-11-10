@@ -109,6 +109,7 @@ lcg [опции] <описание команды>
   LCG_PROXY_URL           URL прокси для proxy провайдера (по умолчанию: /api/v1/protected/sberchat/chat)
   LCG_API_KEY_FILE        Файл с API ключом (по умолчанию: .openai_api_key)
   LCG_APP_NAME            Название приложения (по умолчанию: Linux Command GPT)
+  LCG_ALLOW_THINK         только для ollama: разрешить модели отправлять свои размышления ("1" или "true" = разрешено, пусто = запрещено). Имеет смысл для моделей, которые поддерживают эти действия: qwen3, deepseek.  
 
 Настройки истории и выполнения:
   LCG_NO_HISTORY          Отключить запись истории ("1" или "true" = отключено, пусто = включено)
@@ -163,12 +164,18 @@ lcg [опции] <описание команды>
 				Usage:   "Disable writing/updating command history (overrides LCG_NO_HISTORY)",
 				Value:   false,
 			},
+			&cli.BoolFlag{
+				Name:        "think",
+				Aliases:     []string{"T"},
+				Usage:       "Разрешить модели отправлять свои размышления",
+				Value:       false,				
+			},
 			&cli.StringFlag{
 				Name:        "query",
 				Aliases:     []string{"Q"},
 				Usage:       "Query to send to the model",
-				DefaultText: "Hello? what day is it today?",
-				Value:       "Hello? what day is it today?",
+				DefaultText: "Привет! Порадуй меня случайной Linux командой ...",
+				Value:       "Привет! Порадуй меня случайной Linux командой ...",
 			},
 			&cli.StringFlag{
 				Name:        "sys",
@@ -216,7 +223,10 @@ lcg [опции] <описание команды>
 			if c.IsSet("model") {
 				config.AppConfig.Model = model
 			}
-
+			config.AppConfig.Think = false
+			if c.IsSet("think") {
+				config.AppConfig.Think = c.Bool("think")
+			}
 			promptID := c.Int("prompt-id")
 			timeout := c.Int("timeout")
 
@@ -1018,7 +1028,7 @@ func printDebugInfo(file, system, commandInput string, timeout int) {
 	fmt.Printf("📁 Файл: %s\n", file)
 	fmt.Printf("🤖 Системный промпт: %s\n", system)
 	fmt.Printf("💬 Запрос: %s\n", commandInput)
-	fmt.Printf("⏱️  Таймаут: %d сек\n", timeout)
+	fmt.Printf("⏱️ Таймаут: %d сек\n", timeout)
 	fmt.Printf("🌐 Провайдер: %s\n", config.AppConfig.ProviderType)
 	fmt.Printf("🏠 Хост: %s\n", config.AppConfig.Host)
 	fmt.Printf("🧠 Модель: %s\n", config.AppConfig.Model)
