@@ -27,6 +27,7 @@ type Config struct {
 	ResultHistory  string
 	NoHistoryEnv   string
 	AllowExecution bool
+	Think          bool
 	Query          string
 	MainFlags      MainFlags
 	Server         ServerConfig
